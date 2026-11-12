@@ -285,20 +285,30 @@ function handleDeleteMedia(id, fileId) {
     return responseJSON({ status: 'error', message: 'ID media tidak valid.' });
   }
 
-  if (fileId) {
-    try {
-      DriveApp.getFileById(fileId).setTrashed(true);
-    } catch (e) {}
-  }
-
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Media');
   const rows = sheet.getDataRange().getValues();
+  let targetRow = -1;
+  let storedFileId = '';
+
   for (let i = 1; i < rows.length; i++) {
     if (cell_(rows[i][0]) === targetId) {
-      sheet.deleteRow(i + 1);
+      targetRow = i;
+      storedFileId = cell_(rows[i][8]);
       break;
     }
   }
+
+  if (targetRow === -1) {
+    return responseJSON({ status: 'error', message: 'Data media tidak ditemukan.' });
+  }
+
+  if (fileId && fileId === storedFileId) {
+    try {
+      DriveApp.getFileById(storedFileId).setTrashed(true);
+    } catch (e) {}
+  }
+
+  sheet.deleteRow(targetRow + 1);
   return responseJSON({ status: 'success', message: 'Data dihapus' });
 }
 
@@ -393,7 +403,8 @@ function getFolderId_(config) {
 
 function parseMaxMb_(value) {
   const maxMb = parseInt(value, 10);
-  return Number.isFinite(maxMb) && maxMb > 0 ? maxMb : DEFAULT_MAX_MB;
+  if (!Number.isFinite(maxMb) || maxMb < 1) return DEFAULT_MAX_MB;
+  return Math.min(maxMb, DEFAULT_MAX_MB);
 }
 
 function getOrCreateUnitFolder_(mainFolder, unit) {

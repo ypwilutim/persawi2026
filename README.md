@@ -47,3 +47,5 @@ Vercel akan otomatis deploy dari branch `main`. Root `/` diarahkan ke `public.ht
 - `MAX_FILE_MB` dibatasi maksimal 25 MB karena upload dikirim sebagai base64 JSON.
 - Token sesi dibuat otomatis dan disimpan di Script Properties (`AUTH_SECRET`).
 - Endpoint `addUser`, `deleteMedia`, `updateConfig`, dan `upload` memerlukan token sesi.
+- Ganti password default `admin`/`admin2026` dan `malili1`/`media2026` di sheet `Users` sebelum dipakai.
+- Jangan menaruh token GitHub di URL remote. Gunakan SSH, GitHub CLI, atau credential helper.

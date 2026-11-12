@@ -47,7 +47,10 @@ async function loadSiteConfig() {
   try {
     const result = await apiGet('getConfig');
     if (result.status === 'success') {
-      return result.config;
+      const config = Object.assign({}, result.config);
+      const maxMb = parseInt(config.MAX_FILE_MB, 10);
+      config.MAX_FILE_MB = String(Math.min(Number.isFinite(maxMb) && maxMb > 0 ? maxMb : 25, 25));
+      return config;
     }
   } catch (e) {
     console.error("Gagal memuat config:", e);
