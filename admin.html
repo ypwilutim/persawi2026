@@ -24,8 +24,7 @@
 
   <main class="max-w-7xl mx-auto p-6 space-y-6">
 
-    <!-- Statistik -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
       <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
         <p class="text-xs font-semibold text-slate-500 uppercase">Total File Masuk</p>
         <p class="text-3xl font-bold text-slate-900 mt-1" id="statTotal">0</p>
@@ -38,14 +37,89 @@
         <p class="text-xs font-semibold text-slate-500 uppercase">Total Video</p>
         <p class="text-3xl font-bold text-purple-600 mt-1" id="statVideo">0</p>
       </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <p class="text-xs font-semibold text-slate-500 uppercase">Progress Tugas Media</p>
+        <div class="flex items-end gap-2 mt-1">
+          <p class="text-3xl font-bold text-emerald-600" id="statTaskPercent">0%</p>
+          <p class="text-xs text-slate-500 mb-1" id="statTaskDetail">0/0 unit</p>
+        </div>
+      </div>
     </div>
 
+    <section class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+      <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+        <div>
+          <h2 class="font-bold text-lg">Rundown Acara & Tugas Media</h2>
+          <p class="text-xs text-slate-500 mt-1">Setiap rundown menjadi tugas wajib untuk seluruh unit media.</p>
+        </div>
+        <button onclick="loadRundown()" class="text-sm bg-slate-900 text-white px-3 py-1.5 rounded-lg">Refresh</button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <form id="rundownForm" class="space-y-3 text-sm">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium mb-1">Tanggal</label>
+              <input type="date" id="runDate" required class="w-full px-3 py-2 border rounded-lg">
+            </div>
+            <div>
+              <label class="block text-xs font-medium mb-1">Jam</label>
+              <input type="time" id="runTime" required class="w-full px-3 py-2 border rounded-lg">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1">Judul Tugas / Momen</label>
+            <input type="text" id="runTitle" placeholder="Contoh: Pembukaan & Pelepasan Kontingen" required class="w-full px-3 py-2 border rounded-lg">
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1">Kategori</label>
+            <input type="text" id="runKategori" list="kategoriList" placeholder="Contoh: Kegiatan_Lomba" required class="w-full px-3 py-2 border rounded-lg">
+            <datalist id="kategoriList">
+              <option value="Persiapan_Latihan"></option>
+              <option value="Keberangkatan_Kedatangan"></option>
+              <option value="Mendirikan_Tenda"></option>
+              <option value="Makan_Bersama"></option>
+              <option value="Kegiatan_Lomba"></option>
+              <option value="Candid_Lainnya"></option>
+            </datalist>
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1">Lokasi</label>
+            <input type="text" id="runLokasi" placeholder="Contoh: Lapangan Utama" class="w-full px-3 py-2 border rounded-lg">
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1">Keterangan</label>
+            <textarea id="runKeterangan" rows="2" placeholder="Instruksi atau catatan untuk media" class="w-full px-3 py-2 border rounded-lg"></textarea>
+          </div>
+          <button type="submit" id="btnAddRundown" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium">
+            Tambah Rundown
+          </button>
+        </form>
+
+        <div class="lg:col-span-2">
+          <div class="overflow-x-auto border border-slate-200 rounded-lg">
+            <table class="w-full text-left border-collapse text-sm">
+              <thead>
+                <tr class="bg-slate-50 border-b text-xs uppercase text-slate-500">
+                  <th class="p-3">Jadwal</th>
+                  <th class="p-3">Tugas</th>
+                  <th class="p-3">Kategori</th>
+                  <th class="p-3">Progress Unit</th>
+                  <th class="p-3 text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="rundownBody" class="divide-y">
+                <tr><td colspan="5" class="p-6 text-center text-slate-500">Memuat rundown...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-      
-      <!-- Sidebar Kontrol Admin -->
+
       <div class="lg:col-span-1 space-y-6">
-        
-        <!-- Form Tambah Akun User Media -->
         <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
           <h2 class="font-bold text-base mb-3 border-b pb-2">Tambah Akun Media Sekolah</h2>
           <form id="addUserForm" class="space-y-3 text-sm">
@@ -71,7 +145,6 @@
           </form>
         </div>
 
-        <!-- Form Pengaturan Sheet Config -->
         <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
           <h2 class="font-bold text-base mb-3 border-b pb-2">Konfigurasi Sistem (Sheet Config)</h2>
           <form id="configForm" class="space-y-3 text-sm">
@@ -85,17 +158,15 @@
             </div>
             <div>
               <label class="block text-xs font-medium mb-1">Maksimal Ukuran Upload (MB)</label>
-              <input type="number" id="cfgMaxMb" required class="w-full px-3 py-2 border rounded-lg">
+              <input type="number" id="cfgMaxMb" min="1" max="25" required class="w-full px-3 py-2 border rounded-lg">
             </div>
             <button type="submit" id="btnSaveConfig" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium">
               Update Konfigurasi
             </button>
           </form>
         </div>
-
       </div>
 
-      <!-- Tabel Rekap Media -->
       <div class="lg:col-span-3 bg-white p-5 rounded-xl shadow-sm border border-slate-200 h-fit">
         <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
           <h2 class="font-bold text-lg">Daftar Seluruh File Dokumentasi</h2>
@@ -113,7 +184,7 @@
               <tr class="bg-slate-50 border-b text-xs uppercase text-slate-500">
                 <th class="p-3">Waktu</th>
                 <th class="p-3">Unit & Pengunggah</th>
-                <th class="p-3">Kategori</th>
+                <th class="p-3">Kategori / Tugas</th>
                 <th class="p-3">File & Keterangan</th>
                 <th class="p-3 text-right">Aksi</th>
               </tr>
@@ -135,6 +206,8 @@
     }
 
     let allMedia = [];
+    let rundownTasks = [];
+    let taskProgress = [];
 
     function logout() {
       clearSession();
@@ -151,11 +224,14 @@
       return true;
     }
 
+    document.getElementById('runDate').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('runTime').value = '08:00';
+
     loadSiteConfig().then(cfg => {
       document.getElementById('adminTitle').textContent = `Dashboard Pusat ${cfg.EVENT_NAME}`;
       document.getElementById('cfgFolderId').value = cfg.FOLDER_ID || '';
       document.getElementById('cfgEventName').value = cfg.EVENT_NAME || '';
-      document.getElementById('cfgMaxMb').value = cfg.MAX_FILE_MB || '38';
+      document.getElementById('cfgMaxMb').value = cfg.MAX_FILE_MB || '25';
     });
 
     async function loadAllMedia() {
@@ -198,6 +274,7 @@
           </td>
           <td class="p-3">
             <span class="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-medium">${escapeHtml(item.kategori)}</span>
+            ${item.task_judul ? `<div class="text-xs text-slate-500 mt-1">${escapeHtml(item.task_judul)}</div>` : ''}
           </td>
           <td class="p-3">
             <div class="font-medium text-slate-800 break-all">${escapeHtml(item.filename)}</div>
@@ -209,6 +286,91 @@
           </td>
         </tr>
       `).join('');
+    }
+
+    async function loadRundown() {
+      if (!requireSession()) return;
+      try {
+        const [rundownResult, progressResult] = await Promise.all([
+          apiGet('getRundown'),
+          apiGet('getTaskProgress', { token: getStoredToken() })
+        ]);
+        if (rundownResult.status !== 'success') throw new Error(rundownResult.message || 'Gagal memuat rundown');
+        if (progressResult.status !== 'success') throw new Error(progressResult.message || 'Gagal memuat progress');
+
+        rundownTasks = Array.isArray(rundownResult.data) ? rundownResult.data : [];
+        taskProgress = Array.isArray(progressResult.data) ? progressResult.data : [];
+        const summary = progressResult.summary || {};
+
+        document.getElementById('statTaskPercent').textContent = (summary.percent || 0) + '%';
+        document.getElementById('statTaskDetail').textContent = `${summary.total_completed || 0}/${summary.total_assignments || 0} unit`;
+
+        renderRundown();
+      } catch (e) {
+        alert(e.message || 'Gagal memuat rundown');
+        if (/Sesi/.test(e.message || '')) requireSession();
+      }
+    }
+
+    function renderRundown() {
+      const tbody = document.getElementById('rundownBody');
+      const progressMap = {};
+      taskProgress.forEach(item => { progressMap[item.id] = item; });
+
+      if (rundownTasks.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-500">Belum ada rundown. Tambahkan tugas pertama.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rundownTasks.map(task => {
+        const progress = progressMap[task.id] || { completed_units: 0, total_units: 0, percent: 0 };
+        return `
+          <tr class="hover:bg-slate-50 align-top">
+            <td class="p-3 whitespace-nowrap">
+              <div class="text-xs font-semibold text-slate-700">${escapeHtml(formatTanggalID(task.tanggal))}</div>
+              <div class="text-xs text-slate-500">${escapeHtml(formatJam(task.jam))}</div>
+            </td>
+            <td class="p-3">
+              <div class="font-semibold text-slate-800">${escapeHtml(task.judul)}</div>
+              ${task.lokasi ? `<div class="text-xs text-slate-500">${escapeHtml(task.lokasi)}</div>` : ''}
+              ${task.keterangan ? `<div class="text-xs text-slate-500 mt-1">${escapeHtml(task.keterangan)}</div>` : ''}
+            </td>
+            <td class="p-3">
+              <span class="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-medium">${escapeHtml(task.kategori)}</span>
+            </td>
+            <td class="p-3 min-w-[150px]">
+              <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div class="h-full bg-emerald-500" style="width: ${progress.percent}%"></div>
+              </div>
+              <div class="text-xs text-slate-500 mt-1">${progress.completed_units}/${progress.total_units} unit &bull; ${progress.percent}%</div>
+            </td>
+            <td class="p-3 text-right">
+              <button type="button" data-rundown-id="${escapeHtml(task.id)}" class="text-xs bg-red-100 text-red-700 px-2.5 py-1.5 rounded hover:bg-red-200">Hapus</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    document.getElementById('rundownBody').addEventListener('click', function (event) {
+      const button = event.target.closest('[data-rundown-id]');
+      if (button) deleteRundown(button.getAttribute('data-rundown-id'));
+    });
+
+    async function deleteRundown(id) {
+      if (!confirm('Hapus rundown ini beserta seluruh progress tugasnya?')) return;
+      if (!requireSession()) return;
+      try {
+        const result = await apiPost({ action: 'deleteRundown', id: id, token: getStoredToken() });
+        if (result.status !== 'success') {
+          alert(result.message || 'Gagal menghapus rundown');
+          if (/Sesi/.test(result.message || '')) requireSession();
+          return;
+        }
+        loadRundown();
+      } catch (e) {
+        alert('Gagal menghapus rundown');
+      }
     }
 
     document.getElementById('tableBody').addEventListener('click', function (event) {
@@ -229,10 +391,45 @@
           return;
         }
         loadAllMedia();
+        loadRundown();
       } catch (e) {
         alert('Gagal menghapus');
       }
     }
+
+    document.getElementById('rundownForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!requireSession()) return;
+      const btn = document.getElementById('btnAddRundown');
+      btn.disabled = true;
+      btn.textContent = 'Menyimpan...';
+
+      try {
+        const result = await apiPost({
+          action: 'addRundown',
+          tanggal: document.getElementById('runDate').value,
+          jam: document.getElementById('runTime').value,
+          judul: document.getElementById('runTitle').value.trim(),
+          kategori: document.getElementById('runKategori').value.trim(),
+          lokasi: document.getElementById('runLokasi').value.trim(),
+          keterangan: document.getElementById('runKeterangan').value.trim(),
+          token: getStoredToken()
+        });
+        if (result.status === 'success') {
+          document.getElementById('rundownForm').reset();
+          document.getElementById('runDate').value = new Date().toISOString().slice(0, 10);
+          loadRundown();
+        } else {
+          alert(result.message || 'Gagal menambah rundown');
+          if (/Sesi/.test(result.message || '')) requireSession();
+        }
+      } catch (e) {
+        alert('Gagal menambah rundown');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Tambah Rundown';
+      }
+    });
 
     document.getElementById('addUserForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -255,6 +452,7 @@
           alert('Akun media berhasil ditambahkan!');
           document.getElementById('addUserForm').reset();
           document.getElementById('newPass').value = 'media2026';
+          loadRundown();
         } else {
           alert(result.message || 'Gagal menambah akun');
           if (/Sesi/.test(result.message || '')) requireSession();
@@ -299,6 +497,7 @@
     });
 
     loadAllMedia();
+    loadRundown();
   </script>
 </body>
 </html>

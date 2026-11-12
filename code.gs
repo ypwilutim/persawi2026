@@ -2,7 +2,7 @@ const CONFIG_PLACEHOLDER = 'TEMPEL_FOLDER_ID_DISINI';
 const DEFAULT_MAX_MB = 25;
 const SESSION_HOURS = 12;
 const CONFIG_KEYS = ['FOLDER_ID', 'EVENT_NAME', 'EVENT_SUBTITLE', 'EVENT_SLOGAN', 'MAX_FILE_MB'];
-const API_VERSION = '2026-11-12-auth';
+const API_VERSION = '2026-11-12-tasks';
 
 function setupDatabaseSheets() {
   ensureDatabase_();
@@ -38,8 +38,25 @@ function ensureDatabase_() {
     sheetMedia = ss.insertSheet('Media');
     sheetMedia.appendRow([
       'id', 'timestamp', 'unit', 'uploader', 'kategori',
-      'filename', 'filetype', 'drive_url', 'file_id', 'keterangan'
+      'filename', 'filetype', 'drive_url', 'file_id', 'keterangan', 'task_id'
     ]);
+  } else {
+    const header = sheetMedia.getRange(1, 1, 1, Math.max(sheetMedia.getLastColumn(), 1)).getValues()[0];
+    if (header.indexOf('task_id') === -1) {
+      sheetMedia.getRange(1, header.length + 1).setValue('task_id');
+    }
+  }
+
+  let sheetRundown = ss.getSheetByName('Rundown');
+  if (!sheetRundown) {
+    sheetRundown = ss.insertSheet('Rundown');
+    sheetRundown.appendRow(['id', 'tanggal', 'jam', 'judul', 'kategori', 'lokasi', 'keterangan', 'created_at']);
+  }
+
+  let sheetProgress = ss.getSheetByName('TaskProgress');
+  if (!sheetProgress) {
+    sheetProgress = ss.insertSheet('TaskProgress');
+    sheetProgress.appendRow(['task_id', 'unit', 'status', 'completed_at', 'completed_by', 'media_id', 'keterangan']);
   }
 
   getAuthSecret_();
@@ -67,6 +84,9 @@ function doGet(e) {
     const action = params.action || '';
 
     if (action === 'getMedia') return handleGetMedia(params);
+    if (action === 'getRundown') return handleGetRundown();
+    if (action === 'getMyProgress') return handleGetMyProgress(params.token);
+    if (action === 'getTaskProgress') return handleGetTaskProgress(params.token);
     if (action === 'getUsers') return handleGetUsers(params.token);
     if (action === 'getConfig') return responseJSON({ status: 'success', config: getAppConfig() });
     if (action === 'ping') return responseJSON({ status: 'ok', version: API_VERSION });
@@ -90,6 +110,8 @@ function doPost(e) {
     const action = data.action;
     const protection = {
       upload: ['media', 'admin'],
+      addRundown: ['admin'],
+      deleteRundown: ['admin'],
       addUser: ['admin'],
       deleteMedia: ['admin'],
       updateConfig: ['admin']
@@ -107,6 +129,10 @@ function doPost(e) {
       return handleLogin(data.username, data.password);
     } else if (action === 'upload') {
       return handleUpload(data);
+    } else if (action === 'addRundown') {
+      return handleAddRundown(data);
+    } else if (action === 'deleteRundown') {
+      return handleDeleteRundown(data.id);
     } else if (action === 'addUser') {
       return handleAddUser(data);
     } else if (action === 'deleteMedia') {
@@ -166,11 +192,17 @@ function handleUpload(data) {
     });
   }
 
+  const taskId = String(data.task_id == null ? '' : data.task_id).trim();
+  const task = taskId ? getTaskById_(taskId) : null;
+  if (taskId && !task) {
+    return responseJSON({ status: 'error', message: 'Tugas rundown tidak ditemukan.' });
+  }
+
   const contentType = String(data.mimeType || 'application/octet-stream');
   const filename = sanitizeFilename_(data.filename || ('file_' + Date.now()));
   const unit = auth.un;
   const uploader = auth.n || String(data.uploader == null ? '' : data.uploader).trim();
-  const kategori = String(data.kategori == null ? '' : data.kategori).trim();
+  const kategori = task ? task.kategori : (String(data.kategori == null ? '' : data.kategori).trim() || 'Candid_Lainnya');
   const keterangan = String(data.keterangan == null ? '' : data.keterangan).trim();
 
   if (!unit) {
@@ -189,7 +221,7 @@ function handleUpload(data) {
   const driveUrl = 'https://drive.google.com/file/d/' + fileId + '/view';
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Media');
   const id = 'MED-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
-  const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
+  const timestamp = nowText_();
 
   sheet.appendRow([
     id,
@@ -201,8 +233,13 @@ function handleUpload(data) {
     contentType.indexOf('video') === 0 ? 'video' : 'image',
     driveUrl,
     fileId,
-    keterangan
+    keterangan,
+    taskId
   ]);
+
+  if (taskId) {
+    markTaskComplete_(taskId, unit, uploader, fileId, keterangan);
+  }
 
   return responseJSON({ status: 'success', message: 'Berhasil diunggah!', url: driveUrl });
 }
@@ -212,11 +249,14 @@ function handleGetMedia(params) {
   const rows = sheet.getDataRange().getValues();
   const filterUnit = params.unit ? String(params.unit).trim() : '';
   const filterKategori = params.kategori ? String(params.kategori).trim() : '';
+  const taskMap = getRundownMap_();
   const data = [];
 
   for (let i = 1; i < rows.length; i++) {
     if (!rows[i][0]) continue;
 
+    const taskId = cell_(rows[i][10]);
+    const task = taskMap[taskId];
     const item = {
       id: cell_(rows[i][0]),
       timestamp: cell_(rows[i][1]),
@@ -227,7 +267,10 @@ function handleGetMedia(params) {
       filetype: cell_(rows[i][6]),
       drive_url: cell_(rows[i][7]),
       file_id: cell_(rows[i][8]),
-      keterangan: cell_(rows[i][9])
+      keterangan: cell_(rows[i][9]),
+      task_id: taskId,
+      task_judul: task ? task.judul : '',
+      task_schedule: task ? (task.tanggal + ' ' + task.jam) : ''
     };
 
     if (filterUnit && item.unit !== filterUnit) continue;
@@ -236,6 +279,144 @@ function handleGetMedia(params) {
   }
 
   return responseJSON({ status: 'success', data: data.reverse() });
+}
+
+function handleGetRundown() {
+  return responseJSON({ status: 'success', data: getRundownTasks_() });
+}
+
+function handleAddRundown(data) {
+  const tanggal = String(data.tanggal == null ? '' : data.tanggal).trim();
+  const jam = String(data.jam == null ? '' : data.jam).trim();
+  const judul = String(data.judul == null ? '' : data.judul).trim();
+  const kategori = String(data.kategori == null ? '' : data.kategori).trim() || 'Candid_Lainnya';
+  const lokasi = String(data.lokasi == null ? '' : data.lokasi).trim();
+  const keterangan = String(data.keterangan == null ? '' : data.keterangan).trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(tanggal)) {
+    return responseJSON({ status: 'error', message: 'Tanggal harus format YYYY-MM-DD.' });
+  }
+  if (!/^\d{2}:\d{2}$/.test(jam)) {
+    return responseJSON({ status: 'error', message: 'Jam harus format HH:MM.' });
+  }
+  if (!judul) {
+    return responseJSON({ status: 'error', message: 'Judul tugas wajib diisi.' });
+  }
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Rundown');
+  const id = 'RUN-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+  const createdAt = nowText_();
+
+  sheet.appendRow([id, tanggal, jam, judul, kategori, lokasi, keterangan, createdAt]);
+  return responseJSON({
+    status: 'success',
+    message: 'Rundown berhasil ditambahkan',
+    data: { id: id, tanggal: tanggal, jam: jam, judul: judul, kategori: kategori, lokasi: lokasi, keterangan: keterangan }
+  });
+}
+
+function handleDeleteRundown(id) {
+  const targetId = String(id == null ? '' : id).trim();
+  if (!targetId) {
+    return responseJSON({ status: 'error', message: 'ID rundown tidak valid.' });
+  }
+
+  const rundownSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Rundown');
+  const rundownRows = rundownSheet.getDataRange().getValues();
+  let found = false;
+  for (let i = rundownRows.length - 1; i >= 1; i--) {
+    if (cell_(rundownRows[i][0]) === targetId) {
+      rundownSheet.deleteRow(i + 1);
+      found = true;
+    }
+  }
+  if (!found) {
+    return responseJSON({ status: 'error', message: 'Rundown tidak ditemukan.' });
+  }
+
+  const progressSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('TaskProgress');
+  const progressRows = progressSheet.getDataRange().getValues();
+  for (let i = progressRows.length - 1; i >= 1; i--) {
+    if (cell_(progressRows[i][0]) === targetId) {
+      progressSheet.deleteRow(i + 1);
+    }
+  }
+
+  return responseJSON({ status: 'success', message: 'Rundown dihapus' });
+}
+
+function handleGetMyProgress(token) {
+  if (!verifyToken_(token, ['media', 'admin'])) {
+    return responseJSON({ status: 'error', message: 'Tidak diizinkan.' });
+  }
+
+  const auth = verifyToken_(token, ['media', 'admin']);
+  const progress = getProgressMapForUnit_(auth.un);
+  const tasks = getRundownTasks_().map(task => {
+    const row = progress[task.id];
+    return Object.assign({}, task, {
+      status: row ? row.status : 'Belum',
+      completed_at: row ? row.completed_at : '',
+      media_id: row ? row.media_id : ''
+    });
+  });
+
+  const completed = tasks.filter(task => task.status === 'Selesai').length;
+  const total = tasks.length;
+  const percent = total ? Math.round((completed / total) * 100) : 0;
+
+  return responseJSON({
+    status: 'success',
+    data: tasks,
+    summary: { unit: auth.un, total: total, completed: completed, percent: percent }
+  });
+}
+
+function handleGetTaskProgress(token) {
+  if (!verifyToken_(token, ['admin'])) {
+    return responseJSON({ status: 'error', message: 'Tidak diizinkan.' });
+  }
+
+  const tasks = getRundownTasks_();
+  const units = getMediaUnits_();
+  const progressRows = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('TaskProgress').getDataRange().getValues();
+  const completedMap = {};
+
+  for (let i = 1; i < progressRows.length; i++) {
+    const taskId = cell_(progressRows[i][0]).trim();
+    const unit = cell_(progressRows[i][1]).trim();
+    const status = cell_(progressRows[i][2]).trim();
+    if (!taskId || status !== 'Selesai') continue;
+    if (units.indexOf(unit) === -1) continue;
+    if (!completedMap[taskId]) completedMap[taskId] = {};
+    completedMap[taskId][unit] = true;
+  }
+
+  const data = tasks.map(task => {
+    const completedUnits = completedMap[task.id] ? Object.keys(completedMap[task.id]).length : 0;
+    const totalUnits = units.length;
+    return Object.assign({}, task, {
+      completed_units: completedUnits,
+      total_units: totalUnits,
+      percent: totalUnits ? Math.round((completedUnits / totalUnits) * 100) : 0
+    });
+  });
+
+  const totalAssignments = tasks.length * units.length;
+  const totalCompleted = data.reduce((sum, task) => sum + task.completed_units, 0);
+  const percent = totalAssignments ? Math.round((totalCompleted / totalAssignments) * 100) : 0;
+
+  return responseJSON({
+    status: 'success',
+    data: data,
+    summary: {
+      total_tasks: tasks.length,
+      total_units: units.length,
+      total_assignments: totalAssignments,
+      total_completed: totalCompleted,
+      percent: percent
+    }
+  });
 }
 
 function handleGetUsers(token) {
@@ -291,11 +472,15 @@ function handleDeleteMedia(id, fileId) {
   const rows = sheet.getDataRange().getValues();
   let targetRow = -1;
   let storedFileId = '';
+  let taskId = '';
+  let unit = '';
 
   for (let i = 1; i < rows.length; i++) {
     if (cell_(rows[i][0]) === targetId) {
       targetRow = i;
       storedFileId = cell_(rows[i][8]);
+      taskId = cell_(rows[i][10]).trim();
+      unit = cell_(rows[i][2]).trim();
       break;
     }
   }
@@ -311,6 +496,11 @@ function handleDeleteMedia(id, fileId) {
   }
 
   sheet.deleteRow(targetRow + 1);
+
+  if (taskId) {
+    recalculateTaskProgress_(taskId, unit);
+  }
+
   return responseJSON({ status: 'success', message: 'Data dihapus' });
 }
 
@@ -339,6 +529,144 @@ function handleUpdateConfig(configs) {
 
   Object.keys(updates).forEach(key => setConfigValue_(sheet, key, updates[key]));
   return responseJSON({ status: 'success', message: 'Konfigurasi diperbarui' });
+}
+
+function getRundownTasks_() {
+  const rows = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Rundown').getDataRange().getValues();
+  const tasks = [];
+  for (let i = 1; i < rows.length; i++) {
+    if (!rows[i][0]) continue;
+    tasks.push({
+      id: cell_(rows[i][0]),
+      tanggal: cell_(rows[i][1]),
+      jam: cell_(rows[i][2]),
+      judul: cell_(rows[i][3]),
+      kategori: cell_(rows[i][4]),
+      lokasi: cell_(rows[i][5]),
+      keterangan: cell_(rows[i][6]),
+      created_at: cell_(rows[i][7])
+    });
+  }
+  tasks.sort((a, b) => (a.tanggal + ' ' + a.jam).localeCompare(b.tanggal + ' ' + b.jam));
+  return tasks;
+}
+
+function getRundownMap_() {
+  const rows = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Rundown').getDataRange().getValues();
+  const map = {};
+  for (let i = 1; i < rows.length; i++) {
+    if (!rows[i][0]) continue;
+    map[cell_(rows[i][0])] = {
+      id: cell_(rows[i][0]),
+      tanggal: cell_(rows[i][1]),
+      jam: cell_(rows[i][2]),
+      judul: cell_(rows[i][3]),
+      kategori: cell_(rows[i][4]),
+      lokasi: cell_(rows[i][5]),
+      keterangan: cell_(rows[i][6])
+    };
+  }
+  return map;
+}
+
+function getTaskById_(id) {
+  const rows = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Rundown').getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (cell_(rows[i][0]) === id) {
+      return {
+        id: cell_(rows[i][0]),
+        tanggal: cell_(rows[i][1]),
+        jam: cell_(rows[i][2]),
+        judul: cell_(rows[i][3]),
+        kategori: cell_(rows[i][4]),
+        lokasi: cell_(rows[i][5]),
+        keterangan: cell_(rows[i][6])
+      };
+    }
+  }
+  return null;
+}
+
+function getProgressMapForUnit_(unit) {
+  const rows = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('TaskProgress').getDataRange().getValues();
+  const map = {};
+  for (let i = 1; i < rows.length; i++) {
+    if (cell_(rows[i][1]).trim() !== unit) continue;
+    const taskId = cell_(rows[i][0]).trim();
+    if (!taskId) continue;
+    map[taskId] = {
+      task_id: taskId,
+      unit: cell_(rows[i][1]).trim(),
+      status: cell_(rows[i][2]),
+      completed_at: cell_(rows[i][3]),
+      completed_by: cell_(rows[i][4]),
+      media_id: cell_(rows[i][5]),
+      keterangan: cell_(rows[i][6])
+    };
+  }
+  return map;
+}
+
+function markTaskComplete_(taskId, unit, uploader, mediaId, keterangan) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('TaskProgress');
+  const rows = sheet.getDataRange().getValues();
+  const completedAt = nowText_();
+
+  for (let i = 1; i < rows.length; i++) {
+    if (cell_(rows[i][0]) === taskId && cell_(rows[i][1]) === unit) {
+      sheet.getRange(i + 1, 3).setValue('Selesai');
+      sheet.getRange(i + 1, 4).setValue(completedAt);
+      sheet.getRange(i + 1, 5).setValue(uploader);
+      sheet.getRange(i + 1, 6).setValue(mediaId);
+      sheet.getRange(i + 1, 7).setValue(keterangan);
+      return;
+    }
+  }
+
+  sheet.appendRow([taskId, unit, 'Selesai', completedAt, uploader, mediaId, keterangan]);
+}
+
+function recalculateTaskProgress_(taskId, unit) {
+  const mediaSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Media');
+  const mediaRows = mediaSheet.getDataRange().getValues();
+  let latestMedia = null;
+
+  for (let i = 1; i < mediaRows.length; i++) {
+    if (cell_(mediaRows[i][10]).trim() !== taskId || cell_(mediaRows[i][2]).trim() !== unit) continue;
+    if (cell_(mediaRows[i][8])) {
+      latestMedia = {
+        id: cell_(mediaRows[i][0]),
+        fileId: cell_(mediaRows[i][8]),
+        uploader: cell_(mediaRows[i][3]),
+        keterangan: cell_(mediaRows[i][9])
+      };
+    }
+  }
+
+  const progressSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('TaskProgress');
+  const progressRows = progressSheet.getDataRange().getValues();
+
+  for (let i = progressRows.length - 1; i >= 1; i--) {
+    if (cell_(progressRows[i][0]).trim() !== taskId || cell_(progressRows[i][1]).trim() !== unit) continue;
+    if (latestMedia) {
+      progressSheet.getRange(i + 1, 6).setValue(latestMedia.fileId);
+      progressSheet.getRange(i + 1, 5).setValue(latestMedia.uploader);
+      progressSheet.getRange(i + 1, 7).setValue(latestMedia.keterangan);
+    } else {
+      progressSheet.deleteRow(i + 1);
+    }
+  }
+}
+
+function getMediaUnits_() {
+  const rows = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Users').getDataRange().getValues();
+  const units = {};
+  for (let i = 1; i < rows.length; i++) {
+    const role = cell_(rows[i][2]).trim();
+    const unit = cell_(rows[i][3]).trim();
+    if (role === 'media' && unit) units[unit] = true;
+  }
+  return Object.keys(units);
 }
 
 function getAuthSecret_() {
@@ -432,6 +760,10 @@ function setConfigValue_(sheet, key, value) {
     }
   }
   sheet.appendRow([key, value]);
+}
+
+function nowText_() {
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
 }
 
 function cell_(value) {

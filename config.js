@@ -79,3 +79,23 @@ function safeUrl(value) {
   const url = String(value || '');
   return /^https:\/\//i.test(url) ? url : '#';
 }
+
+const HARI_ID = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+const BULAN_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+function formatTanggalID(tanggal) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(tanggal || ''));
+  if (!match) return tanggal || '-';
+  const date = new Date(String(tanggal) + 'T00:00:00Z');
+  return HARI_ID[date.getUTCDay()] + ', ' + Number(match[3]) + ' ' + BULAN_ID[Number(match[2]) - 1] + ' ' + match[1];
+}
+
+function formatJam(jam) {
+  return jam ? String(jam) + ' WITA' : '-';
+}
+
+function isTaskOverdue(tanggal, jam) {
+  if (!tanggal || !jam) return false;
+  const due = new Date(String(tanggal) + 'T' + String(jam) + ':00');
+  return due.getTime() < Date.now();
+}

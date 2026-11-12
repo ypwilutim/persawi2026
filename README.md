@@ -11,11 +11,21 @@ Aplikasi dokumentasi Photos & Video untuk Persawi 2026 (YPWI Luwu Timur).
 
 - `public.html` - galeri publik (tanpa login).
 - `login.html` - halaman login.
-- `media.html` - panel upload untuk PJ Media tiap unit.
-- `admin.html` - dashboard koordinator: rekap file, tambah akun, pengaturan.
+- `media.html` - panel upload dan daftar tugas untuk PJ Media tiap unit.
+- `admin.html` - dashboard koordinator: kelola rundown, rekap file, tambah akun, pengaturan.
 - `config.js` - URL API dan helper frontend.
 - `code.gs` - backend Apps Script.
 - `vercel.json` - rewrite root ke `public.html`.
+
+## Alur Tugas Media
+
+1. Admin menambahkan rundown di `admin.html` (tanggal, jam, judul, kategori, lokasi, keterangan).
+2. Setiap rundown menjadi tugas untuk seluruh unit media.
+3. Media membuka `media.html`, memilih tugas, lalu mengunggah dokumentasi.
+4. Upload dengan tugas terpilih otomatis menandai tugas selesai untuk unit tersebut.
+5. Admin melihat persentase penyelesaian per tugas dan total; media melihat persentase tugas unitnya.
+
+Sheet `Rundown` menyimpan daftar acara. Sheet `TaskProgress` menyimpan status per unit. Kolom `task_id` di sheet `Media` menghubungkan file dengan tugas.
 
 ## Setup Apps Script
 
@@ -49,3 +59,4 @@ Vercel akan otomatis deploy dari branch `main`. Root `/` diarahkan ke `public.ht
 - Endpoint `addUser`, `deleteMedia`, `updateConfig`, dan `upload` memerlukan token sesi.
 - Ganti password default `admin`/`admin2026` dan `malili1`/`media2026` di sheet `Users` sebelum dipakai.
 - Jangan menaruh token GitHub di URL remote. Gunakan SSH, GitHub CLI, atau credential helper.
+- Tugas dianggap selesai jika ada file yang diunggah dengan `task_id` terkait. Menghapus file terakhir untuk tugas tersebut akan mengembalikan status menjadi belum selesai.
