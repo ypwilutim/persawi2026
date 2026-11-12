@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycby9eURTN0phtR109E53hE1zArfddLo7yEZ9Imd6vjWEt9_f3ZOxHLpDZQRBP9OlMshM/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwkD0_IY7LXehJQ0LdllYF4j28FX2ocBFFgz-E9HpVeGw1_9akSwX_SYD1S9sJ4Eyp8/exec";
 
 function getStoredUser() {
   try {
