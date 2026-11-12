@@ -23,9 +23,14 @@
       </div>
       <div>
         <label class="block text-sm font-medium text-slate-700 mb-1">Asal Sekolah / Unit</label>
-        <input type="text" id="unit" list="sekolahList" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Pilih atau tulis asal sekolah" autocomplete="off">
-        <datalist id="sekolahList"></datalist>
-        <p class="text-[11px] text-slate-500 mt-1">Pilih dari daftar, atau tulis nama sekolah jika belum ada. Satu akun untuk setiap unit sekolah.</p>
+        <select id="unit" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none">
+          <option value="">Pilih asal sekolah</option>
+        </select>
+        <button type="button" id="requestSekolah" class="text-[11px] text-emerald-600 hover:underline mt-1">Sekolah tidak ada dalam daftar? Klik di sini</button>
+        <div id="sekolahInfo" class="hidden text-[11px] text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-2 mt-2">
+          Hubungi koordinator media YPWI untuk menambahkan asal sekolah Anda ke daftar.
+        </div>
+        <p class="text-[11px] text-slate-500 mt-1">Satu akun untuk setiap unit sekolah.</p>
       </div>
       <div>
         <label class="block text-sm font-medium text-slate-700 mb-1">Nomor Telepon / WhatsApp</label>
@@ -72,10 +77,18 @@
     loadSiteConfig().then(cfg => {
       document.getElementById('eventTitle').textContent = `Registrasi ${cfg.EVENT_NAME}`;
       document.title = `Registrasi Media - ${cfg.EVENT_NAME}`;
+
       const daftarSekolah = parseSekolah(cfg.SEKOLAH);
-      document.getElementById('sekolahList').innerHTML = daftarSekolah
-        .map(nama => `<option value="${escapeHtml(nama)}"></option>`)
+      const select = document.getElementById('unit');
+      const current = select.value;
+      select.innerHTML = '<option value="">Pilih asal sekolah</option>' + daftarSekolah
+        .map(nama => `<option value="${escapeHtml(nama)}">${escapeHtml(nama)}</option>`)
         .join('');
+      if (daftarSekolah.indexOf(current) !== -1) select.value = current;
+    });
+
+    document.getElementById('requestSekolah').addEventListener('click', function () {
+      document.getElementById('sekolahInfo').classList.toggle('hidden');
     });
 
     form.addEventListener('submit', async function (event) {
