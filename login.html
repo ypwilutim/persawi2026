@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Media Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="config.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-800 min-h-screen flex items-center justify-center p-4">
+
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+    <div class="text-center mb-6">
+      <span class="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full uppercase">YPWI Luwu Timur</span>
+      <h1 class="text-2xl font-bold text-slate-900 mt-3" id="eventTitle">Media Center</h1>
+      <p class="text-sm text-slate-500 mt-1">Masuk untuk mengelola atau mengunggah dokumentasi</p>
+    </div>
+
+    <form id="loginForm" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Username</label>
+        <input type="text" id="username" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Masukkan username">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
+        <input type="password" id="password" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="••••••••">
+      </div>
+      
+      <div id="errorMsg" class="hidden text-sm text-red-600 bg-red-50 p-3 rounded-lg"></div>
+
+      <button type="submit" id="btnLogin" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg transition">
+        Masuk Sistem
+      </button>
+    </form>
+
+    <div class="mt-6 pt-4 border-t border-slate-100 text-center">
+      <a href="public.html" class="text-sm text-emerald-600 hover:underline font-medium">Lihat Galeri Publik →</a>
+    </div>
+  </div>
+
+  <script>
+    const savedUser = getStoredUser();
+    if (savedUser && getStoredToken()) {
+      window.location.href = savedUser.role === 'admin' ? 'admin.html' : 'media.html';
+    }
+
+    loadSiteConfig().then(cfg => {
+      document.getElementById('eventTitle').textContent = `Media Center ${cfg.EVENT_NAME}`;
+      document.title = `Login - ${cfg.EVENT_NAME}`;
+    });
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('btnLogin');
+      const errorMsg = document.getElementById('errorMsg');
+      
+      btn.disabled = true;
+      btn.textContent = 'Memeriksa kredensial...';
+      errorMsg.classList.add('hidden');
+
+      try {
+        const result = await apiPost({
+          action: 'login',
+          username: document.getElementById('username').value.trim(),
+          password: document.getElementById('password').value.trim()
+        });
+
+        if (result.status === 'success') {
+          if (!result.token) {
+            errorMsg.textContent = 'Backend belum mendukung sesi aman. Perbarui code.gs dan deployment Apps Script terlebih dahulu.';
+            errorMsg.classList.remove('hidden');
+            return;
+          }
+          saveSession(result.user, result.token);
+          window.location.href = result.user.role === 'admin' ? 'admin.html' : 'media.html';
+        } else {
+          errorMsg.textContent = result.message;
+          errorMsg.classList.remove('hidden');
+        }
+      } catch (err) {
+        errorMsg.textContent = 'Gagal terhubung ke server. Pastikan API_URL benar.';
+        errorMsg.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Masuk Sistem';
+      }
+    });
+  </script>
+</body>
+</html>

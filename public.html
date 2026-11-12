@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Galeri Publik - Media Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="config.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+
+  <header class="bg-gradient-to-br from-emerald-900 via-emerald-800 to-slate-900">
+    <div class="max-w-7xl mx-auto px-4 py-10 md:py-14">
+      <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+        <div>
+          <span class="inline-block text-[11px] font-bold tracking-widest uppercase bg-amber-400 text-slate-900 px-3 py-1 rounded-full">Galeri Publik</span>
+          <h1 class="text-3xl md:text-5xl font-bold mt-4 text-white" id="eventName">Media Center</h1>
+          <p class="text-emerald-100 mt-2 text-sm md:text-base" id="eventSubtitle">Memuat informasi acara...</p>
+          <p class="text-emerald-300/80 mt-1 text-xs md:text-sm italic" id="eventSlogan"></p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <a id="sessionLink" href="login.html" class="text-sm bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-lg font-medium">Masuk</a>
+          <button onclick="loadMedia()" class="text-sm bg-emerald-500 hover:bg-emerald-400 text-slate-900 px-4 py-2 rounded-lg font-semibold">Refresh</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-6 md:py-8 space-y-6">
+
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Total File</p>
+        <p class="text-2xl md:text-3xl font-bold mt-1" id="statTotal">0</p>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Foto</p>
+        <p class="text-2xl md:text-3xl font-bold mt-1 text-sky-400" id="statFoto">0</p>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Video</p>
+        <p class="text-2xl md:text-3xl font-bold mt-1 text-purple-400" id="statVideo">0</p>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Unit Sekolah</p>
+        <p class="text-2xl md:text-3xl font-bold mt-1 text-amber-400" id="statUnit">0</p>
+      </div>
+    </section>
+
+    <section class="bg-slate-900 border border-slate-800 rounded-xl p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+      <select id="filterUnit" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+        <option value="">Semua Unit Sekolah</option>
+      </select>
+      <select id="filterKategori" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+        <option value="">Semua Kategori</option>
+      </select>
+      <input id="searchInput" type="search" placeholder="Cari keterangan, file, atau pengunggah..." class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+    </section>
+
+    <section>
+      <div id="gallery" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div class="col-span-full text-center py-16 text-slate-500 text-sm">Memuat galeri...</div>
+      </div>
+      <div id="emptyState" class="hidden text-center py-16">
+        <p class="text-4xl mb-3">🖼️</p>
+        <p class="text-slate-400 font-medium">Belum ada dokumentasi yang ditampilkan.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="border-t border-slate-900 py-6 text-center text-xs text-slate-600">
+    Media Center <span id="footerEvent">PERSAWI 2026</span> &middot; YPWI Luwu Timur
+  </footer>
+
+  <div id="lightbox" class="fixed inset-0 z-50 hidden bg-black/95 p-4 md:p-8">
+    <div class="max-w-6xl mx-auto h-full flex flex-col">
+      <div class="flex items-start justify-between gap-4 pb-3">
+        <div class="min-w-0">
+          <h3 class="font-semibold text-white truncate" id="lightboxTitle"></h3>
+          <p class="text-xs text-slate-400 mt-1" id="lightboxMeta"></p>
+        </div>
+        <button data-close-lightbox class="shrink-0 w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 text-white text-lg leading-none">&times;</button>
+      </div>
+      <div id="lightboxContent" class="flex-1 min-h-0 flex items-center justify-center"></div>
+    </div>
+  </div>
+
+  <script>
+    const KATEGORI_LABEL = {
+      Persiapan_Latihan: 'Persiapan & Latihan',
+      Keberangkatan_Kedatangan: 'Perjalanan & Kedatangan',
+      Mendirikan_Tenda: 'Mendirikan Tenda',
+      Makan_Bersama: 'Makan Bersama',
+      Kegiatan_Lomba: 'Kegiatan Utama & Lomba',
+      Candid_Lainnya: 'Candid / Lainnya'
+    };
+
+    let allMedia = [];
+
+    function kategoriLabel(kategori) {
+      return KATEGORI_LABEL[kategori] || kategori || 'Lainnya';
+    }
+
+    function thumbnailUrl(fileId, size) {
+      return 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(fileId) + '&sz=' + (size || 800);
+    }
+
+    function previewUrl(fileId) {
+      return 'https://drive.google.com/file/d/' + encodeURIComponent(fileId) + '/preview';
+    }
+
+    function cardTemplate(item) {
+      const isVideo = item.filetype === 'video';
+      const thumb = thumbnailUrl(item.file_id, 800);
+      const caption = item.keterangan || item.filename || 'Dokumentasi';
+
+      return `
+        <article class="group bg-slate-900 border border-slate-800 rounded-xl overflow-hidden flex flex-col">
+          <button type="button" data-lightbox="${escapeHtml(item.id)}" class="relative block w-full aspect-[4/3] bg-slate-800 overflow-hidden text-left">
+            <img src="${escapeHtml(thumb)}" alt="${escapeHtml(caption)}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+            ${isVideo ? '<span class="absolute inset-0 flex items-center justify-center bg-black/25"><span class="w-12 h-12 rounded-full bg-white/90 text-slate-900 flex items-center justify-center text-lg">▶</span></span>' : ''}
+          </button>
+          <div class="p-3 flex flex-col gap-2 flex-1">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300">${escapeHtml(kategoriLabel(item.kategori))}</span>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded ${isVideo ? 'bg-purple-500/15 text-purple-300' : 'bg-sky-500/15 text-sky-300'}">${isVideo ? 'VIDEO' : 'FOTO'}</span>
+            </div>
+            <p class="text-sm font-semibold text-slate-100 line-clamp-2">${escapeHtml(caption)}</p>
+            <p class="text-xs text-slate-400">${escapeHtml(item.unit)}</p>
+            <div class="mt-auto pt-2 border-t border-slate-800 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+              <span class="truncate">${escapeHtml(item.uploader)}</span>
+              <span class="shrink-0">${escapeHtml(item.timestamp)}</span>
+            </div>
+            <div class="flex gap-2 pt-1">
+              <button type="button" data-lightbox="${escapeHtml(item.id)}" class="flex-1 text-xs bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-semibold py-1.5 rounded-md">Lihat</button>
+              <a href="${escapeHtml(safeUrl(item.drive_url))}" target="_blank" rel="noopener" class="flex-1 text-center text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 py-1.5 rounded-md">Drive</a>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function getFilteredMedia() {
+      const unit = document.getElementById('filterUnit').value;
+      const kategori = document.getElementById('filterKategori').value;
+      const query = document.getElementById('searchInput').value.trim().toLowerCase();
+
+      return allMedia.filter(item => {
+        if (unit && item.unit !== unit) return false;
+        if (kategori && item.kategori !== kategori) return false;
+        if (!query) return true;
+        return [item.filename, item.keterangan, item.uploader, item.unit, item.kategori]
+          .some(value => String(value || '').toLowerCase().includes(query));
+      });
+    }
+
+    function renderGallery() {
+      const gallery = document.getElementById('gallery');
+      const empty = document.getElementById('emptyState');
+      const items = getFilteredMedia();
+
+      if (items.length === 0) {
+        gallery.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+
+      empty.classList.add('hidden');
+      gallery.innerHTML = items.map(cardTemplate).join('');
+    }
+
+    function populateFilters() {
+      const units = [...new Set(allMedia.map(item => item.unit).filter(Boolean))].sort();
+      const kategori = [...new Set(allMedia.map(item => item.kategori).filter(Boolean))].sort();
+      const unitSelect = document.getElementById('filterUnit');
+      const kategoriSelect = document.getElementById('filterKategori');
+      const currentUnit = unitSelect.value;
+      const currentKategori = kategoriSelect.value;
+
+      unitSelect.innerHTML = '<option value="">Semua Unit Sekolah</option>' +
+        units.map(unit => `<option value="${escapeHtml(unit)}">${escapeHtml(unit)}</option>`).join('');
+      kategoriSelect.innerHTML = '<option value="">Semua Kategori</option>' +
+        kategori.map(item => `<option value="${escapeHtml(item)}">${escapeHtml(kategoriLabel(item))}</option>`).join('');
+
+      unitSelect.value = currentUnit;
+      kategoriSelect.value = currentKategori;
+    }
+
+    function updateStats() {
+      document.getElementById('statTotal').textContent = allMedia.length;
+      document.getElementById('statFoto').textContent = allMedia.filter(item => item.filetype !== 'video').length;
+      document.getElementById('statVideo').textContent = allMedia.filter(item => item.filetype === 'video').length;
+      document.getElementById('statUnit').textContent = new Set(allMedia.map(item => item.unit).filter(Boolean)).size;
+    }
+
+    async function loadMedia() {
+      const gallery = document.getElementById('gallery');
+      const empty = document.getElementById('emptyState');
+      empty.classList.add('hidden');
+      gallery.innerHTML = '<div class="col-span-full text-center py-16 text-slate-500 text-sm">Memuat galeri...</div>';
+
+      try {
+        const result = await apiGet('getMedia');
+        if (result.status !== 'success') throw new Error(result.message || 'Gagal memuat data');
+        allMedia = Array.isArray(result.data) ? result.data : [];
+        updateStats();
+        populateFilters();
+        renderGallery();
+      } catch (err) {
+        gallery.innerHTML = '<div class="col-span-full text-center py-16 text-red-400 text-sm">Gagal memuat galeri. Coba refresh beberapa saat lagi.</div>';
+      }
+    }
+
+    function openLightbox(id) {
+      const item = allMedia.find(entry => entry.id === id);
+      if (!item) return;
+
+      const lightbox = document.getElementById('lightbox');
+      const content = document.getElementById('lightboxContent');
+      const title = document.getElementById('lightboxTitle');
+      const meta = document.getElementById('lightboxMeta');
+
+      title.textContent = item.keterangan || item.filename || 'Dokumentasi';
+      meta.textContent = [item.unit, item.uploader, item.timestamp].filter(Boolean).join(' • ');
+
+      if (item.filetype === 'video') {
+        content.innerHTML = `<iframe src="${escapeHtml(previewUrl(item.file_id))}" class="w-full h-[70vh] rounded-lg bg-black" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
+      } else {
+        const src = thumbnailUrl(item.file_id, 1600);
+        content.innerHTML = `<img src="${escapeHtml(src)}" alt="${escapeHtml(title.textContent)}" class="max-w-full max-h-[75vh] object-contain rounded-lg">`;
+      }
+
+      lightbox.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+      const lightbox = document.getElementById('lightbox');
+      lightbox.classList.add('hidden');
+      document.getElementById('lightboxContent').innerHTML = '';
+      document.body.style.overflow = '';
+    }
+
+    document.getElementById('gallery').addEventListener('click', function (event) {
+      const trigger = event.target.closest('[data-lightbox]');
+      if (trigger) openLightbox(trigger.getAttribute('data-lightbox'));
+    });
+
+    document.getElementById('lightbox').addEventListener('click', function (event) {
+      if (event.target === this || event.target.closest('[data-close-lightbox]')) closeLightbox();
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') closeLightbox();
+    });
+
+    ['filterUnit', 'filterKategori'].forEach(function (id) {
+      document.getElementById(id).addEventListener('change', renderGallery);
+    });
+    document.getElementById('searchInput').addEventListener('input', renderGallery);
+
+    const session = getStoredUser();
+    if (session && getStoredToken()) {
+      const link = document.getElementById('sessionLink');
+      link.textContent = 'Dashboard';
+      link.href = session.role === 'admin' ? 'admin.html' : 'media.html';
+    }
+
+    loadSiteConfig().then(function (cfg) {
+      const name = cfg.EVENT_NAME || 'PERSAWI 2026';
+      document.getElementById('eventName').textContent = 'Galeri ' + name;
+      document.getElementById('eventSubtitle').textContent = cfg.EVENT_SUBTITLE || '';
+      document.getElementById('eventSlogan').textContent = cfg.EVENT_SLOGAN || '';
+      document.getElementById('footerEvent').textContent = name;
+      document.title = 'Galeri Publik - ' + name;
+    });
+
+    loadMedia();
+  </script>
+</body>
+</html>

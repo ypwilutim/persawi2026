@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Koordinator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="config.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+
+  <nav class="bg-slate-900 text-white px-6 py-4 shadow">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <div>
+        <span class="text-xs bg-amber-500 text-slate-900 font-bold px-2 py-0.5 rounded">KOORDINATOR MEDIA & HUMAS</span>
+        <h1 class="font-bold text-lg mt-1" id="adminTitle">Dashboard Pusat</h1>
+      </div>
+      <div class="flex gap-3">
+        <a href="public.html" class="text-sm bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg">Galeri Publik</a>
+        <button onclick="logout()" class="text-sm bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg">Keluar</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-7xl mx-auto p-6 space-y-6">
+
+    <!-- Statistik -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <p class="text-xs font-semibold text-slate-500 uppercase">Total File Masuk</p>
+        <p class="text-3xl font-bold text-slate-900 mt-1" id="statTotal">0</p>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <p class="text-xs font-semibold text-slate-500 uppercase">Total Foto</p>
+        <p class="text-3xl font-bold text-blue-600 mt-1" id="statFoto">0</p>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <p class="text-xs font-semibold text-slate-500 uppercase">Total Video</p>
+        <p class="text-3xl font-bold text-purple-600 mt-1" id="statVideo">0</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      
+      <!-- Sidebar Kontrol Admin -->
+      <div class="lg:col-span-1 space-y-6">
+        
+        <!-- Form Tambah Akun User Media -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h2 class="font-bold text-base mb-3 border-b pb-2">Tambah Akun Media Sekolah</h2>
+          <form id="addUserForm" class="space-y-3 text-sm">
+            <div>
+              <label class="block text-xs font-medium mb-1">Unit / Sekolah</label>
+              <input type="text" id="newUnit" placeholder="Contoh: SDIT Insan Rabbani Malili" required class="w-full px-3 py-2 border rounded-lg">
+            </div>
+            <div>
+              <label class="block text-xs font-medium mb-1">Nama PJ Media</label>
+              <input type="text" id="newNama" placeholder="Nama lengkap" required class="w-full px-3 py-2 border rounded-lg">
+            </div>
+            <div>
+              <label class="block text-xs font-medium mb-1">Username Login</label>
+              <input type="text" id="newUser" placeholder="contoh: media_malili" required class="w-full px-3 py-2 border rounded-lg">
+            </div>
+            <div>
+              <label class="block text-xs font-medium mb-1">Password</label>
+              <input type="text" id="newPass" value="media2026" required class="w-full px-3 py-2 border rounded-lg">
+            </div>
+            <button type="submit" id="btnAddUser" class="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-lg font-medium">
+              Simpan Akun Baru
+            </button>
+          </form>
+        </div>
+
+        <!-- Form Pengaturan Sheet Config -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h2 class="font-bold text-base mb-3 border-b pb-2">Konfigurasi Sistem (Sheet Config)</h2>
+          <form id="configForm" class="space-y-3 text-sm">
+            <div>
+              <label class="block text-xs font-medium mb-1">Folder ID Google Drive</label>
+              <input type="text" id="cfgFolderId" required class="w-full px-3 py-2 border rounded-lg font-mono text-xs">
+            </div>
+            <div>
+              <label class="block text-xs font-medium mb-1">Nama Event</label>
+              <input type="text" id="cfgEventName" required class="w-full px-3 py-2 border rounded-lg">
+            </div>
+            <div>
+              <label class="block text-xs font-medium mb-1">Maksimal Ukuran Upload (MB)</label>
+              <input type="number" id="cfgMaxMb" required class="w-full px-3 py-2 border rounded-lg">
+            </div>
+            <button type="submit" id="btnSaveConfig" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium">
+              Update Konfigurasi
+            </button>
+          </form>
+        </div>
+
+      </div>
+
+      <!-- Tabel Rekap Media -->
+      <div class="lg:col-span-3 bg-white p-5 rounded-xl shadow-sm border border-slate-200 h-fit">
+        <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+          <h2 class="font-bold text-lg">Daftar Seluruh File Dokumentasi</h2>
+          <div class="flex gap-2">
+            <select id="filterUnit" onchange="renderTable()" class="text-sm border rounded-lg px-3 py-1.5 bg-white">
+              <option value="ALL">Semua Unit Sekolah</option>
+            </select>
+            <button onclick="loadAllMedia()" class="text-sm bg-emerald-600 text-white px-3 py-1.5 rounded-lg">Refresh</button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="bg-slate-50 border-b text-xs uppercase text-slate-500">
+                <th class="p-3">Waktu</th>
+                <th class="p-3">Unit & Pengunggah</th>
+                <th class="p-3">Kategori</th>
+                <th class="p-3">File & Keterangan</th>
+                <th class="p-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody" class="divide-y">
+              <tr><td colspan="5" class="p-6 text-center text-slate-500">Memuat data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    const user = getStoredUser();
+    if (!user || user.role !== 'admin' || !getStoredToken()) {
+      window.location.href = 'login.html';
+    }
+
+    let allMedia = [];
+
+    function logout() {
+      clearSession();
+      window.location.href = 'login.html';
+    }
+
+    function requireSession() {
+      const current = getStoredUser();
+      if (!current || !getStoredToken()) {
+        clearSession();
+        window.location.href = 'login.html';
+        return false;
+      }
+      return true;
+    }
+
+    loadSiteConfig().then(cfg => {
+      document.getElementById('adminTitle').textContent = `Dashboard Pusat ${cfg.EVENT_NAME}`;
+      document.getElementById('cfgFolderId').value = cfg.FOLDER_ID || '';
+      document.getElementById('cfgEventName').value = cfg.EVENT_NAME || '';
+      document.getElementById('cfgMaxMb').value = cfg.MAX_FILE_MB || '38';
+    });
+
+    async function loadAllMedia() {
+      try {
+        const result = await apiGet('getMedia');
+        if (result.status !== 'success') throw new Error(result.message || 'Gagal memuat data');
+        allMedia = Array.isArray(result.data) ? result.data : [];
+
+        document.getElementById('statTotal').textContent = allMedia.length;
+        document.getElementById('statFoto').textContent = allMedia.filter(m => m.filetype === 'image').length;
+        document.getElementById('statVideo').textContent = allMedia.filter(m => m.filetype === 'video').length;
+
+        const units = [...new Set(allMedia.map(m => m.unit))];
+        const select = document.getElementById('filterUnit');
+        select.innerHTML = '<option value="ALL">Semua Unit Sekolah</option>' +
+          units.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+
+        renderTable();
+      } catch (e) {
+        alert('Gagal memuat data dari Spreadsheet');
+      }
+    }
+
+    function renderTable() {
+      const filter = document.getElementById('filterUnit').value;
+      const filtered = filter === 'ALL' ? allMedia : allMedia.filter(m => m.unit === filter);
+      const tbody = document.getElementById('tableBody');
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-500">Tidak ada data.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(item => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 text-xs text-slate-500 whitespace-nowrap">${escapeHtml(item.timestamp)}</td>
+          <td class="p-3">
+            <div class="font-semibold text-slate-800">${escapeHtml(item.unit)}</div>
+            <div class="text-xs text-slate-500">Oleh: ${escapeHtml(item.uploader)}</div>
+          </td>
+          <td class="p-3">
+            <span class="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-medium">${escapeHtml(item.kategori)}</span>
+          </td>
+          <td class="p-3">
+            <div class="font-medium text-slate-800 break-all">${escapeHtml(item.filename)}</div>
+            <div class="text-xs text-slate-500">${escapeHtml(item.keterangan)}</div>
+          </td>
+          <td class="p-3 text-right whitespace-nowrap space-x-2">
+            <a href="${escapeHtml(safeUrl(item.drive_url))}" target="_blank" rel="noopener" class="text-xs bg-blue-600 text-white px-2.5 py-1.5 rounded hover:bg-blue-700">Buka Drive</a>
+            <button type="button" data-delete-id="${escapeHtml(item.id)}" data-file-id="${escapeHtml(item.file_id)}" class="text-xs bg-red-100 text-red-700 px-2.5 py-1.5 rounded hover:bg-red-200">Hapus</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    document.getElementById('tableBody').addEventListener('click', function (event) {
+      const button = event.target.closest('[data-delete-id]');
+      if (button) {
+        deleteItem(button.getAttribute('data-delete-id'), button.getAttribute('data-file-id'));
+      }
+    });
+
+    async function deleteItem(id, fileId) {
+      if (!confirm('Hapus file ini secara permanen dari Drive & Database?')) return;
+      if (!requireSession()) return;
+      try {
+        const result = await apiPost({ action: 'deleteMedia', id: id, fileId: fileId, token: getStoredToken() });
+        if (result.status !== 'success') {
+          alert(result.message || 'Gagal menghapus');
+          if (/Sesi/.test(result.message || '')) requireSession();
+          return;
+        }
+        loadAllMedia();
+      } catch (e) {
+        alert('Gagal menghapus');
+      }
+    }
+
+    document.getElementById('addUserForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!requireSession()) return;
+      const btn = document.getElementById('btnAddUser');
+      btn.disabled = true;
+      btn.textContent = 'Menyimpan...';
+
+      try {
+        const result = await apiPost({
+          action: 'addUser',
+          unit: document.getElementById('newUnit').value,
+          nama: document.getElementById('newNama').value,
+          username: document.getElementById('newUser').value,
+          password: document.getElementById('newPass').value,
+          role: 'media',
+          token: getStoredToken()
+        });
+        if (result.status === 'success') {
+          alert('Akun media berhasil ditambahkan!');
+          document.getElementById('addUserForm').reset();
+          document.getElementById('newPass').value = 'media2026';
+        } else {
+          alert(result.message || 'Gagal menambah akun');
+          if (/Sesi/.test(result.message || '')) requireSession();
+        }
+      } catch (e) {
+        alert('Gagal menambah akun');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Simpan Akun Baru';
+      }
+    });
+
+    document.getElementById('configForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!requireSession()) return;
+      const btn = document.getElementById('btnSaveConfig');
+      btn.disabled = true;
+      btn.textContent = 'Menyimpan...';
+
+      try {
+        const result = await apiPost({
+          action: 'updateConfig',
+          configs: {
+            FOLDER_ID: document.getElementById('cfgFolderId').value.trim(),
+            EVENT_NAME: document.getElementById('cfgEventName').value.trim(),
+            MAX_FILE_MB: document.getElementById('cfgMaxMb').value.trim()
+          },
+          token: getStoredToken()
+        });
+        if (result.status === 'success') {
+          alert('Konfigurasi Sheet berhasil diperbarui!');
+        } else {
+          alert(result.message || 'Gagal memperbarui konfigurasi');
+          if (/Sesi/.test(result.message || '')) requireSession();
+        }
+      } catch (e) {
+        alert('Gagal memperbarui konfigurasi');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Update Konfigurasi';
+      }
+    });
+
+    loadAllMedia();
+  </script>
+</body>
+</html>
