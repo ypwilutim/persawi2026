@@ -2,6 +2,7 @@ const CONFIG_PLACEHOLDER = 'TEMPEL_FOLDER_ID_DISINI';
 const DEFAULT_MAX_MB = 25;
 const SESSION_HOURS = 12;
 const CONFIG_KEYS = ['FOLDER_ID', 'EVENT_NAME', 'EVENT_SUBTITLE', 'EVENT_SLOGAN', 'MAX_FILE_MB'];
+const API_VERSION = '2026-11-12-auth';
 
 function setupDatabaseSheets() {
   ensureDatabase_();
@@ -68,7 +69,8 @@ function doGet(e) {
     if (action === 'getMedia') return handleGetMedia(params);
     if (action === 'getUsers') return handleGetUsers(params.token);
     if (action === 'getConfig') return responseJSON({ status: 'success', config: getAppConfig() });
-    return responseJSON({ status: 'ok', message: 'API Media Center Aktif' });
+    if (action === 'ping') return responseJSON({ status: 'ok', version: API_VERSION });
+    return responseJSON({ status: 'ok', message: 'API Media Center Aktif', version: API_VERSION });
   } catch (err) {
     return responseJSON({ status: 'error', message: err.message });
   }
