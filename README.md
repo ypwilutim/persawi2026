@@ -20,7 +20,7 @@ Aplikasi dokumentasi Photos & Video untuk Persawi 2026 (YPWI Luwu Timur).
 
 ## Registrasi Media
 
-Media dapat mendaftar sendiri melalui `register.html` dengan mengisi nama, asal sekolah, dan nomor telepon. Username otomatis berupa nomor telepon (format `+62...`), password default `persawi2026`, dan password dapat diganti dari halaman `media.html`. Satu akun hanya untuk satu unit sekolah. Admin dapat melihat daftar akun media beserta nomor telepon di `admin.html`.
+Media dapat mendaftar sendiri melalui `register.html` dengan mengisi nama, asal sekolah, dan nomor telepon. Asal sekolah berupa input dengan saran dropdown yang diambil dari key `SEKOLAH` di sheet `Config` (format dipisah koma). Jika sekolah belum ada, media tetap dapat menulis namanya langsung. Username otomatis berupa nomor telepon (format `+62...`), password default `persawi2026`, dan password dapat diganti dari halaman `media.html`. Satu akun hanya untuk satu unit sekolah. Admin dapat mengubah daftar sekolah melalui form Konfigurasi Sistem dan melihat akun media di `admin.html`.
 
 ## Alur Tugas Media
 

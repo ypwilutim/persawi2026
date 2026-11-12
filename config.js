@@ -43,24 +43,36 @@ async function apiPost(payload) {
   return res.json();
 }
 
+const DEFAULT_SITE_CONFIG = {
+  EVENT_NAME: "PERSAWI 2026",
+  EVENT_SUBTITLE: "Perkemahan Santri Wahdah Islamiyah",
+  EVENT_SLOGAN: "Tunas Muda Berjiwa Rabbani Menuju Luwu Timur Juara",
+  SEKOLAH: "SDIT Insan Rabbani Malili",
+  MAX_FILE_MB: "25"
+};
+
 async function loadSiteConfig() {
+  let config = {};
   try {
     const result = await apiGet('getConfig');
     if (result.status === 'success') {
-      const config = Object.assign({}, result.config);
-      const maxMb = parseInt(config.MAX_FILE_MB, 10);
-      config.MAX_FILE_MB = String(Math.min(Number.isFinite(maxMb) && maxMb > 0 ? maxMb : 25, 25));
-      return config;
+      config = result.config || {};
     }
   } catch (e) {
     console.error("Gagal memuat config:", e);
   }
-  return {
-    EVENT_NAME: "PERSAWI 2026",
-    EVENT_SUBTITLE: "Perkemahan Santri Wahdah Islamiyah",
-    EVENT_SLOGAN: "Tunas Muda Berjiwa Rabbani Menuju Luwu Timur Juara",
-    MAX_FILE_MB: "25"
-  };
+
+  const merged = Object.assign({}, DEFAULT_SITE_CONFIG, config);
+  const maxMb = parseInt(merged.MAX_FILE_MB, 10);
+  merged.MAX_FILE_MB = String(Math.min(Number.isFinite(maxMb) && maxMb > 0 ? maxMb : 25, 25));
+  return merged;
+}
+
+function parseSekolah(value) {
+  return String(value == null ? '' : value)
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
 }
 
 function escapeHtml(value) {

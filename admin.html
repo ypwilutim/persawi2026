@@ -161,6 +161,10 @@
               <input type="text" id="cfgEventName" required class="w-full px-3 py-2 border rounded-lg">
             </div>
             <div>
+              <label class="block text-xs font-medium mb-1">Daftar Asal Sekolah (pisahkan koma)</label>
+              <textarea id="cfgSekolah" rows="2" class="w-full px-3 py-2 border rounded-lg" placeholder="SDIT A, SDIT B, SMP C"></textarea>
+            </div>
+            <div>
               <label class="block text-xs font-medium mb-1">Maksimal Ukuran Upload (MB)</label>
               <input type="number" id="cfgMaxMb" min="1" max="25" required class="w-full px-3 py-2 border rounded-lg">
             </div>
@@ -245,6 +249,7 @@
       document.getElementById('adminTitle').textContent = `Dashboard Pusat ${cfg.EVENT_NAME}`;
       document.getElementById('cfgFolderId').value = cfg.FOLDER_ID || '';
       document.getElementById('cfgEventName').value = cfg.EVENT_NAME || '';
+      document.getElementById('cfgSekolah').value = cfg.SEKOLAH || '';
       document.getElementById('cfgMaxMb').value = cfg.MAX_FILE_MB || '25';
     });
 
@@ -519,6 +524,7 @@
           configs: {
             FOLDER_ID: document.getElementById('cfgFolderId').value.trim(),
             EVENT_NAME: document.getElementById('cfgEventName').value.trim(),
+            SEKOLAH: document.getElementById('cfgSekolah').value.trim(),
             MAX_FILE_MB: document.getElementById('cfgMaxMb').value.trim()
           },
           token: getStoredToken()

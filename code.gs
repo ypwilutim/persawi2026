@@ -1,8 +1,8 @@
 const CONFIG_PLACEHOLDER = 'TEMPEL_FOLDER_ID_DISINI';
 const DEFAULT_MAX_MB = 25;
 const SESSION_HOURS = 12;
-const CONFIG_KEYS = ['FOLDER_ID', 'EVENT_NAME', 'EVENT_SUBTITLE', 'EVENT_SLOGAN', 'MAX_FILE_MB'];
-const API_VERSION = '2026-11-12-register';
+const CONFIG_KEYS = ['FOLDER_ID', 'EVENT_NAME', 'EVENT_SUBTITLE', 'EVENT_SLOGAN', 'SEKOLAH', 'MAX_FILE_MB'];
+const API_VERSION = '2026-11-12-sekolah';
 
 function setupDatabaseSheets() {
   ensureDatabase_();
@@ -21,8 +21,21 @@ function ensureDatabase_() {
       ['EVENT_NAME', 'PERSAWI 2026'],
       ['EVENT_SUBTITLE', 'Perkemahan Santri Wahdah Islamiyah'],
       ['EVENT_SLOGAN', 'Tunas Muda Berjiwa Rabbani Menuju Luwu Timur Juara'],
+      ['SEKOLAH', 'SDIT Insan Rabbani Malili'],
       ['MAX_FILE_MB', String(DEFAULT_MAX_MB)]
     ].forEach(row => sheetConfig.appendRow(row));
+  }
+
+  const configRows = sheetConfig.getDataRange().getValues();
+  let hasSekolah = false;
+  for (let i = 1; i < configRows.length; i++) {
+    if (String(configRows[i][0] == null ? '' : configRows[i][0]).trim() === 'SEKOLAH') {
+      hasSekolah = true;
+      break;
+    }
+  }
+  if (!hasSekolah) {
+    sheetConfig.appendRow(['SEKOLAH', 'SDIT Insan Rabbani Malili']);
   }
 
   let sheetUsers = ss.getSheetByName('Users');
