@@ -70,7 +70,7 @@ async function loadSiteConfig() {
 
 function parseSekolah(value) {
   return String(value == null ? '' : value)
-    .split(',')
+    .split(/[\n,]+/)
     .map(item => item.trim())
     .filter(Boolean);
 }
