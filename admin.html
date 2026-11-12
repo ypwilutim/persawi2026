@@ -139,6 +139,10 @@
               <label class="block text-xs font-medium mb-1">Password</label>
               <input type="text" id="newPass" value="media2026" required class="w-full px-3 py-2 border rounded-lg">
             </div>
+            <div>
+              <label class="block text-xs font-medium mb-1">Nomor Telepon</label>
+              <input type="tel" id="newPhone" placeholder="08xxxxxxxxxx" class="w-full px-3 py-2 border rounded-lg">
+            </div>
             <button type="submit" id="btnAddUser" class="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-lg font-medium">
               Simpan Akun Baru
             </button>
@@ -160,10 +164,20 @@
               <label class="block text-xs font-medium mb-1">Maksimal Ukuran Upload (MB)</label>
               <input type="number" id="cfgMaxMb" min="1" max="25" required class="w-full px-3 py-2 border rounded-lg">
             </div>
-            <button type="submit" id="btnSaveConfig" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium">
-              Update Konfigurasi
-            </button>
-          </form>
+          <button type="submit" id="btnSaveConfig" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium">
+            Update Konfigurasi
+          </button>
+        </form>
+        </div>
+
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <div class="flex justify-between items-center mb-3 border-b pb-2">
+            <h2 class="font-bold text-base">Akun Media Terdaftar</h2>
+            <button onclick="loadUsers()" class="text-xs bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded">Refresh</button>
+          </div>
+          <div id="userList" class="space-y-2 text-xs max-h-72 overflow-y-auto pr-1">
+            <p class="text-slate-500 text-center py-4">Memuat akun...</p>
+          </div>
         </div>
       </div>
 
@@ -286,6 +300,31 @@
           </td>
         </tr>
       `).join('');
+    }
+
+    async function loadUsers() {
+      if (!requireSession()) return;
+      const container = document.getElementById('userList');
+      try {
+        const result = await apiGet('getUsers', { token: getStoredToken() });
+        if (result.status !== 'success') throw new Error(result.message || 'Gagal memuat akun');
+        const mediaUsers = (result.users || []).filter(item => item.role === 'media');
+
+        if (mediaUsers.length === 0) {
+          container.innerHTML = '<p class="text-slate-500 text-center py-4">Belum ada akun media.</p>';
+          return;
+        }
+
+        container.innerHTML = mediaUsers.map(item => `
+          <div class="border border-slate-200 rounded-lg p-2 bg-slate-50">
+            <div class="font-semibold text-slate-800">${escapeHtml(item.nama || '-')}</div>
+            <div class="text-slate-500">${escapeHtml(item.unit || '-')}</div>
+            <div class="text-slate-500">@${escapeHtml(item.username || '-')} &bull; ${escapeHtml(item.telepon || '-')}</div>
+          </div>
+        `).join('');
+      } catch (e) {
+        container.innerHTML = '<p class="text-red-500 text-center py-4">Gagal memuat akun.</p>';
+      }
     }
 
     async function loadRundown() {
@@ -445,6 +484,7 @@
           nama: document.getElementById('newNama').value,
           username: document.getElementById('newUser').value,
           password: document.getElementById('newPass').value,
+          telepon: document.getElementById('newPhone').value.trim(),
           role: 'media',
           token: getStoredToken()
         });
@@ -453,6 +493,7 @@
           document.getElementById('addUserForm').reset();
           document.getElementById('newPass').value = 'media2026';
           loadRundown();
+          loadUsers();
         } else {
           alert(result.message || 'Gagal menambah akun');
           if (/Sesi/.test(result.message || '')) requireSession();
@@ -498,6 +539,7 @@
 
     loadAllMedia();
     loadRundown();
+    loadUsers();
   </script>
 </body>
 </html>

@@ -28,9 +28,14 @@ function ensureDatabase_() {
   let sheetUsers = ss.getSheetByName('Users');
   if (!sheetUsers) {
     sheetUsers = ss.insertSheet('Users');
-    sheetUsers.appendRow(['username', 'password', 'role', 'unit', 'nama']);
-    sheetUsers.appendRow(['admin', 'admin2026', 'admin', 'Koordinator YPWI', 'Akbar Irwansya']);
-    sheetUsers.appendRow(['malili1', 'media2026', 'media', 'SDIT Insan Rabbani Malili', 'Tim Media 1']);
+    sheetUsers.appendRow(['username', 'password', 'role', 'unit', 'nama', 'telepon']);
+    sheetUsers.appendRow(['admin', 'admin2026', 'admin', 'Koordinator YPWI', 'Akbar Irwansya', '']);
+    sheetUsers.appendRow(['malili1', 'media2026', 'media', 'SDIT Insan Rabbani Malili', 'Tim Media 1', '']);
+  } else {
+    const header = sheetUsers.getRange(1, 1, 1, Math.max(sheetUsers.getLastColumn(), 1)).getValues()[0];
+    if (header.indexOf('telepon') === -1) {
+      sheetUsers.getRange(1, header.length + 1).setValue('telepon');
+    }
   }
 
   let sheetMedia = ss.getSheetByName('Media');
@@ -127,6 +132,8 @@ function doPost(e) {
 
     if (action === 'login') {
       return handleLogin(data.username, data.password);
+    } else if (action === 'registerMedia') {
+      return handleRegisterMedia(data);
     } else if (action === 'upload') {
       return handleUpload(data);
     } else if (action === 'addRundown') {
@@ -171,6 +178,49 @@ function handleLogin(username, password) {
     }
   }
   return responseJSON({ status: 'error', message: 'Username atau Password salah!' });
+}
+
+function handleRegisterMedia(data) {
+  const nama = String(data.nama == null ? '' : data.nama).trim();
+  const unit = String(data.unit == null ? '' : data.unit).trim();
+  const telepon = String(data.telepon == null ? '' : data.telepon).trim();
+
+  if (!nama || !unit || !telepon) {
+    return responseJSON({ status: 'error', message: 'Nama, asal sekolah, dan nomor telepon wajib diisi.' });
+  }
+
+  const normalizedPhone = normalizePhone_(telepon);
+  if (!normalizedPhone || !/^\+628\d{7,12}$/.test(normalizedPhone)) {
+    return responseJSON({ status: 'error', message: 'Nomor telepon tidak valid. Gunakan nomor Indonesia, contoh 081234567890.' });
+  }
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Users');
+  const rows = sheet.getDataRange().getValues();
+  const existing = {};
+  const takenUsernames = {};
+
+  for (let i = 1; i < rows.length; i++) {
+    const role = cell_(rows[i][2]).trim();
+    const rowUnit = cell_(rows[i][3]).trim();
+    if (role === 'media' && rowUnit.toLowerCase() === unit.toLowerCase()) {
+      existing.unit = rowUnit;
+    }
+    if (cell_(rows[i][0])) takenUsernames[cell_(rows[i][0]).toLowerCase()] = true;
+  }
+
+  if (existing.unit) {
+    return responseJSON({ status: 'error', message: 'Unit ' + existing.unit + ' sudah terdaftar. Silakan login atau hubungi admin.' });
+  }
+
+  const username = generateUsername_(unit, takenUsernames);
+  const password = generatePassword_();
+  sheet.appendRow([username, password, 'media', unit, nama, normalizedPhone]);
+
+  return responseJSON({
+    status: 'success',
+    message: 'Pendaftaran berhasil',
+    user: { username: username, password: password, unit: unit, nama: nama, telepon: normalizedPhone }
+  });
 }
 
 function handleUpload(data) {
@@ -433,7 +483,8 @@ function handleGetUsers(token) {
       username: cell_(rows[i][0]),
       role: cell_(rows[i][2]),
       unit: cell_(rows[i][3]),
-      nama: cell_(rows[i][4])
+      nama: cell_(rows[i][4]),
+      telepon: cell_(rows[i][5])
     });
   }
   return responseJSON({ status: 'success', users: users });
@@ -446,6 +497,7 @@ function handleAddUser(data) {
   const role = data.role === 'admin' ? 'admin' : 'media';
   const unit = String(data.unit == null ? '' : data.unit).trim();
   const nama = String(data.nama == null ? '' : data.nama).trim();
+  const telepon = String(data.telepon == null ? '' : data.telepon).trim();
 
   if (!username || !password || !unit || !nama) {
     return responseJSON({ status: 'error', message: 'Username, password, unit, dan nama wajib diisi.' });
@@ -458,7 +510,7 @@ function handleAddUser(data) {
     }
   }
 
-  sheet.appendRow([username, password, role, unit, nama]);
+  sheet.appendRow([username, password, role, unit, nama, telepon]);
   return responseJSON({ status: 'success', message: 'User berhasil ditambahkan' });
 }
 
@@ -741,6 +793,36 @@ function getOrCreateUnitFolder_(mainFolder, unit) {
   const folders = mainFolder.getFoldersByName(unit);
   if (folders.hasNext()) return folders.next();
   return mainFolder.createFolder(unit);
+}
+
+function normalizePhone_(value) {
+  const phone = String(value || '').replace(/[^0-9+]/g, '');
+  if (/^\+?62/.test(phone)) {
+    return '+' + phone.replace(/^\+/, '');
+  }
+  if (/^0/.test(phone)) {
+    return '+62' + phone.slice(1);
+  }
+  return '';
+}
+
+function generateUsername_(unit, takenUsernames) {
+  const slug = String(unit || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 24) || 'unit';
+  const base = 'media_' + slug;
+
+  if (!takenUsernames[base.toLowerCase()]) return base;
+
+  let counter = 2;
+  while (takenUsernames[(base + '_' + counter).toLowerCase()]) counter++;
+  return base + '_' + counter;
+}
+
+function generatePassword_() {
+  return Utilities.getUuid().replace(/-/g, '').slice(0, 10);
 }
 
 function sanitizeFilename_(name) {

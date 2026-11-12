@@ -11,11 +11,16 @@ Aplikasi dokumentasi Photos & Video untuk Persawi 2026 (YPWI Luwu Timur).
 
 - `public.html` - galeri publik (tanpa login).
 - `login.html` - halaman login.
+- `register.html` - registrasi akun media (nama, asal sekolah, nomor telepon).
 - `media.html` - panel upload dan daftar tugas untuk PJ Media tiap unit.
 - `admin.html` - dashboard koordinator: kelola rundown, rekap file, tambah akun, pengaturan.
 - `config.js` - URL API dan helper frontend.
 - `code.gs` - backend Apps Script.
 - `vercel.json` - rewrite root ke `public.html`.
+
+## Registrasi Media
+
+Media dapat mendaftar sendiri melalui `register.html` dengan mengisi nama, asal sekolah, dan nomor telepon. Sistem membuat username dan password otomatis yang ditampilkan sekali setelah pendaftaran. Satu akun hanya untuk satu unit sekolah. Admin dapat melihat daftar akun media beserta nomor telepon di `admin.html`.
 
 ## Alur Tugas Media
 
