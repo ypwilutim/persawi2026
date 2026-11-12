@@ -1,8 +1,8 @@
 const CONFIG_PLACEHOLDER = 'TEMPEL_FOLDER_ID_DISINI';
 const DEFAULT_MAX_MB = 25;
 const SESSION_HOURS = 12;
-const CONFIG_KEYS = ['FOLDER_ID', 'EVENT_NAME', 'EVENT_SUBTITLE', 'EVENT_SLOGAN', 'SEKOLAH', 'MAX_FILE_MB'];
-const API_VERSION = '2026-11-12-sekolah';
+const CONFIG_KEYS = ['FOLDER_ID', 'EVENT_NAME', 'EVENT_SUBTITLE', 'EVENT_SLOGAN', 'SEKOLAH', 'USER_COUNTER', 'MAX_FILE_MB'];
+const API_VERSION = '2026-11-12-username';
 
 function setupDatabaseSheets() {
   ensureDatabase_();
@@ -22,20 +22,24 @@ function ensureDatabase_() {
       ['EVENT_SUBTITLE', 'Perkemahan Santri Wahdah Islamiyah'],
       ['EVENT_SLOGAN', 'Tunas Muda Berjiwa Rabbani Menuju Luwu Timur Juara'],
       ['SEKOLAH', 'SDIT Insan Rabbani Malili'],
+      ['USER_COUNTER', '0'],
       ['MAX_FILE_MB', String(DEFAULT_MAX_MB)]
     ].forEach(row => sheetConfig.appendRow(row));
   }
 
   const configRows = sheetConfig.getDataRange().getValues();
   let hasSekolah = false;
+  let hasUserCounter = false;
   for (let i = 1; i < configRows.length; i++) {
-    if (String(configRows[i][0] == null ? '' : configRows[i][0]).trim() === 'SEKOLAH') {
-      hasSekolah = true;
-      break;
-    }
+    const key = String(configRows[i][0] == null ? '' : configRows[i][0]).trim();
+    if (key === 'SEKOLAH') hasSekolah = true;
+    if (key === 'USER_COUNTER') hasUserCounter = true;
   }
   if (!hasSekolah) {
     sheetConfig.appendRow(['SEKOLAH', 'SDIT Insan Rabbani Malili']);
+  }
+  if (!hasUserCounter) {
+    sheetConfig.appendRow(['USER_COUNTER', '0']);
   }
 
   let sheetUsers = ss.getSheetByName('Users');
@@ -217,11 +221,14 @@ function handleRegisterMedia(data) {
   const rows = sheet.getDataRange().getValues();
   let existingUnit = '';
   let existingPhone = '';
+  const takenUsernames = {};
 
   for (let i = 1; i < rows.length; i++) {
     const role = cell_(rows[i][2]).trim();
     const rowUnit = cell_(rows[i][3]).trim();
-    const rowPhone = normalizePhone_(cell_(rows[i][0])) || normalizePhone_(cell_(rows[i][5]));
+    const rowUser = cell_(rows[i][0]).trim();
+    const rowPhone = normalizePhone_(rowUser) || normalizePhone_(cell_(rows[i][5]));
+    if (rowUser) takenUsernames[rowUser.toLowerCase()] = true;
     if (role === 'media' && rowUnit.toLowerCase() === unit.toLowerCase()) {
       existingUnit = rowUnit;
     }
@@ -237,13 +244,20 @@ function handleRegisterMedia(data) {
     return responseJSON({ status: 'error', message: 'Nomor ' + existingPhone + ' sudah terdaftar.' });
   }
 
+  let userId = getNextUserId_();
+  let username = generateRegistrationUsername_(nama, userId);
+  while (takenUsernames[username.toLowerCase()]) {
+    userId = getNextUserId_();
+    username = generateRegistrationUsername_(nama, userId);
+  }
+
   const password = 'persawi2026';
-  sheet.appendRow([normalizedPhone, password, 'media', unit, nama, normalizedPhone]);
+  sheet.appendRow([username, password, 'media', unit, nama, normalizedPhone]);
 
   return responseJSON({
     status: 'success',
     message: 'Pendaftaran berhasil',
-    user: { username: normalizedPhone, password: password, unit: unit, nama: nama, telepon: normalizedPhone }
+    user: { username: username, password: password, unit: unit, nama: nama, telepon: normalizedPhone }
   });
 }
 
@@ -854,6 +868,21 @@ function normalizePhone_(value) {
     return '+62' + phone.slice(1);
   }
   return '';
+}
+
+function getNextUserId_() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Config');
+  const config = getAppConfig();
+  const current = parseInt(config.USER_COUNTER, 10);
+  const next = Number.isFinite(current) && current >= 0 ? current + 1 : 1;
+  setConfigValue_(sheet, 'USER_COUNTER', String(next));
+  return next;
+}
+
+function generateRegistrationUsername_(nama, id) {
+  const firstName = String(nama || '').trim().split(/\s+/)[0] || 'USER';
+  const slug = firstName.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20) || 'USER';
+  return slug + '_' + id;
 }
 
 function sanitizeFilename_(name) {
