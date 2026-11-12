@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Panel Media Sekolah</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="config.js"></script>
+  <script src="config.js?v=20261112"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
 
@@ -70,12 +70,23 @@
           </div>
 
           <div>
-            <label class="block text-xs font-semibold uppercase text-slate-500 mb-1" id="fileLabel">Pilih Foto / Video (Maks 25MB/file)</label>
-            <input type="file" id="fileInput" accept="image/*,video/*" required class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100">
+            <label class="block text-xs font-semibold uppercase text-slate-500 mb-1" id="fileLabel">Pilih Foto / Video (bisa banyak file)</label>
+            <input type="file" id="fileInput" accept="image/*,video/*" multiple required class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100">
+            <p class="text-[11px] text-slate-500 mt-1" id="fileHint">File sampai 25MB dikirim ke Google Drive. File lebih besar sampai 2048MB diunggah langsung ke penyimpanan R2.</p>
+            <div id="uploadProgressWrap" class="hidden mt-3">
+              <div class="flex justify-between text-[11px] text-slate-500 mb-1">
+                <span id="uploadStatus">Menyiapkan...</span>
+                <span id="uploadPercent">0%</span>
+              </div>
+              <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div id="uploadProgressBar" class="h-full bg-emerald-500 transition-all" style="width: 0%"></div>
+              </div>
+              <div id="uploadFileList" class="mt-2 space-y-1 max-h-40 overflow-y-auto pr-1"></div>
+            </div>
           </div>
 
           <button type="submit" id="btnUpload" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg transition shadow">
-            Unggah ke Google Drive
+            Unggah Dokumentasi
           </button>
         </form>
 
@@ -134,6 +145,8 @@
     }
 
     let maxFileMB = 25;
+    let maxR2MB = 2048;
+    let uploadQueue = [];
     let myTasks = [];
     let mySummary = { total: 0, completed: 0, percent: 0 };
 
@@ -155,7 +168,9 @@
     loadSiteConfig().then(cfg => {
       document.getElementById('navTitle').textContent = `Media Center ${cfg.EVENT_NAME}`;
       maxFileMB = parseInt(cfg.MAX_FILE_MB) || 25;
-      document.getElementById('fileLabel').textContent = `Pilih Foto / Video (Maks ${maxFileMB}MB/file)`;
+      maxR2MB = parseInt(cfg.MAX_R2_MB) || 2048;
+      document.getElementById('fileLabel').textContent = `Pilih Foto / Video (bisa banyak file • Drive maks ${maxFileMB}MB, R2 maks ${maxR2MB}MB)`;
+      document.getElementById('fileHint').textContent = `File sampai ${maxFileMB}MB dikirim ke Google Drive. File lebih besar sampai ${maxR2MB}MB diunggah langsung ke penyimpanan R2.`;
     });
 
     document.getElementById('userInfo').textContent = `${user.unit} • ${user.nama} • @${user.username}`;
@@ -282,63 +297,291 @@
       }
     });
 
-    document.getElementById('uploadForm').addEventListener('submit', function(e) {
+    function renderUploadQueue(files) {
+      uploadQueue = files.map(function (file) { return { file: file, percent: 0 }; });
+      const list = document.getElementById('uploadFileList');
+      list.innerHTML = uploadQueue.map(function (item, index) {
+        return `
+          <div class="flex items-center gap-2 text-[11px]" id="uploadFile${index}">
+            <span class="w-3 text-center text-slate-400" data-icon>•</span>
+            <span class="flex-1 truncate text-slate-600" title="${escapeHtml(item.file.name)}">${escapeHtml(item.file.name)}</span>
+            <span class="w-16 text-right text-slate-500" data-pct>Menunggu</span>
+          </div>
+        `;
+      }).join('');
+      document.getElementById('uploadProgressWrap').classList.remove('hidden');
+      updateOverallProgress('Menyiapkan...');
+    }
+
+    function updateOverallProgress(status) {
+      const total = uploadQueue.reduce(function (sum, item) { return sum + item.file.size; }, 0);
+      const done = uploadQueue.reduce(function (sum, item) { return sum + item.file.size * (item.percent / 100); }, 0);
+      const percent = total ? Math.round((done / total) * 100) : 0;
+      document.getElementById('uploadProgressBar').style.width = percent + '%';
+      document.getElementById('uploadPercent').textContent = percent + '%';
+      if (status) document.getElementById('uploadStatus').textContent = status;
+    }
+
+    function setFileProgress(index, percent, status) {
+      const item = uploadQueue[index];
+      if (!item) return;
+      item.percent = Math.max(0, Math.min(100, Math.round(percent)));
+      const row = document.getElementById('uploadFile' + index);
+      if (!row) return;
+      const pct = row.querySelector('[data-pct]');
+      const icon = row.querySelector('[data-icon]');
+      if (pct) {
+        if (status === 'Gagal') pct.textContent = 'Gagal';
+        else if (status === 'Selesai' || item.percent >= 100) pct.textContent = 'Selesai';
+        else if (status === 'Menunggu') pct.textContent = 'Menunggu';
+        else pct.textContent = item.percent + '%';
+      }
+      if (icon) {
+        if (status === 'Gagal') icon.textContent = '✕';
+        else if (status === 'Selesai' || item.percent >= 100) icon.textContent = '✓';
+        else icon.textContent = '•';
+      }
+      updateOverallProgress();
+    }
+
+    function resetUploadProgress() {
+      document.getElementById('uploadProgressWrap').classList.add('hidden');
+      document.getElementById('uploadFileList').innerHTML = '';
+      document.getElementById('uploadProgressBar').style.width = '0%';
+      document.getElementById('uploadPercent').textContent = '0%';
+      document.getElementById('uploadStatus').textContent = 'Menyiapkan...';
+      uploadQueue = [];
+    }
+
+    function resolveMimeType(file) {
+      if (file.type) return file.type;
+      const ext = String(file.name.split('.').pop() || '').toLowerCase();
+      if (['mp4', 'm4v', 'mov', 'webm', 'ogv', '3gp'].indexOf(ext) !== -1) return 'video/mp4';
+      return 'image/jpeg';
+    }
+
+    function fileToBase64(file, onProgress) {
+      return new Promise(function (resolve, reject) {
+        const reader = new FileReader();
+        reader.onprogress = function (event) {
+          if (!event.lengthComputable) return;
+          const ratio = event.loaded / event.total;
+          onProgress(ratio * 40, 'Membaca file... ' + Math.round(ratio * 100) + '%');
+        };
+        reader.onload = function () {
+          onProgress(40, 'Mengunggah ke Google Drive...');
+          resolve(String(reader.result).split(',')[1]);
+        };
+        reader.onerror = function () { reject(new Error('Gagal membaca file.')); };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function putWithRetry(file, url, contentType, onProgress) {
+      const maxAttempts = 3;
+      return new Promise(function (resolve, reject) {
+        let attempt = 0;
+
+        function run() {
+          attempt += 1;
+          const xhr = new XMLHttpRequest();
+          xhr.open('PUT', url);
+          xhr.setRequestHeader('Content-Type', contentType);
+
+          xhr.upload.onprogress = function (event) {
+            if (!event.lengthComputable) return;
+            const percent = (event.loaded / event.total) * 90;
+            onProgress(5 + percent, 'Mengunggah... ' + Math.round(percent) + '%');
+          };
+
+          xhr.onload = function () {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              onProgress(92, 'Upload selesai.');
+              resolve();
+            } else {
+              retry(new Error('Upload gagal (HTTP ' + xhr.status + ').'));
+            }
+          };
+          xhr.onerror = function () { retry(new Error('Upload R2 gagal. Periksa koneksi atau CORS R2.')); };
+          xhr.ontimeout = function () { retry(new Error('Upload R2 melewati batas waktu.')); };
+          xhr.send(file);
+        }
+
+        function retry(error) {
+          if (attempt >= maxAttempts) {
+            reject(error);
+            return;
+          }
+          onProgress(5, 'Mencoba ulang (' + attempt + '/' + (maxAttempts - 1) + ')...');
+          window.setTimeout(run, 1500 * attempt);
+        }
+
+        run();
+      });
+    }
+
+    async function uploadToR2(file, options, onProgress) {
+      const mimeType = resolveMimeType(file);
+      onProgress(2, 'Menyiapkan tautan upload...');
+      const signData = await apiPost({
+        action: 'getUploadUrl',
+        token: getStoredToken(),
+        filename: options.customFilename,
+        mimeType: mimeType,
+        size: file.size
+      });
+      if (signData.status !== 'success' || !signData.uploadUrl) {
+        throw new Error(signData.message || 'Gagal menyiapkan upload R2.');
+      }
+
+      onProgress(5, 'Mengunggah ke R2...');
+      await putWithRetry(file, signData.uploadUrl, mimeType, onProgress);
+
+      onProgress(94, 'Menyimpan metadata...');
+      const result = await apiPost({
+        action: 'completeR2Upload',
+        token: getStoredToken(),
+        key: signData.key,
+        publicUrl: signData.publicUrl,
+        filename: options.customFilename,
+        mimeType: mimeType,
+        size: file.size,
+        task_id: options.taskId,
+        kategori: options.kategori,
+        uploader: options.uploader,
+        keterangan: options.keterangan,
+        batch_id: options.batchId
+      });
+      if (result.status !== 'success') {
+        throw new Error(result.message || 'Gagal menyimpan metadata.');
+      }
+      onProgress(100, 'Selesai');
+      return result;
+    }
+
+    async function uploadToDrive(file, options, onProgress) {
+      const mimeType = resolveMimeType(file);
+      onProgress(0, 'Membaca file...');
+      const base64 = await fileToBase64(file, onProgress);
+      onProgress(50, 'Mengunggah ke Google Drive...');
+      const result = await apiPost({
+        action: 'upload',
+        unit: user.unit,
+        uploader: options.uploader,
+        kategori: options.kategori,
+        keterangan: options.keterangan,
+        filename: options.customFilename,
+        mimeType: mimeType,
+        base64: base64,
+        task_id: options.taskId,
+        batch_id: options.batchId,
+        token: getStoredToken()
+      });
+      if (result.status !== 'success') {
+        if (/Sesi/.test(result.message || '')) requireSession();
+        throw new Error(result.message || 'Upload gagal.');
+      }
+      onProgress(95, 'Memproses di Google Drive...');
+      onProgress(100, 'Selesai');
+      return result;
+    }
+
+    document.getElementById('fileInput').addEventListener('change', function () {
+      if (document.getElementById('btnUpload').disabled) return;
+      resetUploadProgress();
+    });
+
+    document.getElementById('uploadForm').addEventListener('submit', async function(e) {
       e.preventDefault();
       if (!requireSession()) return;
-      const file = document.getElementById('fileInput').files[0];
-      if (!file) return;
 
-      if (file.size > maxFileMB * 1024 * 1024) {
-        alert(`Ukuran file terlalu besar (Maksimal ${maxFileMB}MB per upload via web). Silakan kompres video terlebih dahulu.`);
+      const input = document.getElementById('fileInput');
+      const files = Array.from(input.files || []);
+      if (files.length === 0) return;
+
+      const driveLimit = maxFileMB * 1024 * 1024;
+      const r2Limit = maxR2MB * 1024 * 1024;
+      const tooBig = files.find(function (file) { return file.size > r2Limit; });
+      if (tooBig) {
+        alert(`File "${tooBig.name}" terlalu besar (Maksimal ${maxR2MB}MB). Silakan kompres terlebih dahulu.`);
         return;
       }
 
       const btn = document.getElementById('btnUpload');
       btn.disabled = true;
-      btn.textContent = 'Mengunggah ke Drive... (Jangan tutup halaman)';
+      btn.textContent = 'Mengunggah... (Jangan tutup halaman)';
 
-      const reader = new FileReader();
-      reader.onload = async function() {
-        const base64 = reader.result.split(',')[1];
-        const cleanUnit = user.unit.replace(/\s+/g, '');
-        const taskId = document.getElementById('taskSelect').value;
-        const task = myTasks.find(item => item.id === taskId);
-        const kategori = task ? task.kategori : 'Candid_Lainnya';
+      const taskId = document.getElementById('taskSelect').value;
+      const task = myTasks.find(function (item) { return item.id === taskId; });
+      const kategori = task ? task.kategori : 'Candid_Lainnya';
+      const cleanUnit = user.unit.replace(/\s+/g, '');
+      const uploader = document.getElementById('uploader').value;
+      const keterangan = document.getElementById('keterangan').value;
+
+      renderUploadQueue(files);
+
+      let success = 0;
+      let failed = 0;
+      let aborted = false;
+      let firstError = '';
+      const batchId = 'BATCH-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
         const ext = file.name.split('.').pop();
-        const customFilename = `${cleanUnit}_${task ? task.id : 'Candid'}_${Date.now()}.${ext}`;
+        const customFilename = `${cleanUnit}_${task ? task.id : 'Candid'}_${Date.now()}_${i + 1}.${ext}`;
+        const options = {
+          taskId: taskId,
+          kategori: kategori,
+          uploader: uploader,
+          keterangan: keterangan,
+          customFilename: customFilename,
+          batchId: batchId
+        };
+
+        setFileProgress(i, 0, 'Menunggu');
+        updateOverallProgress(`Mengunggah ${i + 1}/${files.length}: ${file.name}`);
 
         try {
-          const result = await apiPost({
-            action: 'upload',
-            unit: user.unit,
-            uploader: document.getElementById('uploader').value,
-            kategori: kategori,
-            keterangan: document.getElementById('keterangan').value,
-            filename: customFilename,
-            mimeType: file.type,
-            base64: base64,
-            task_id: taskId,
-            token: getStoredToken()
-          });
-          if (result.status === 'success') {
-            alert(task ? 'File berhasil diunggah dan tugas ditandai selesai!' : 'File berhasil diunggah ke Google Drive!');
-            document.getElementById('uploadForm').reset();
-            document.getElementById('unit').value = user.unit;
-            document.getElementById('uploader').value = user.nama;
-            loadMyProgress();
-            loadMyMedia();
+          if (file.size <= driveLimit) {
+            await uploadToDrive(file, options, function (percent, status) {
+              setFileProgress(i, percent, status);
+            });
           } else {
-            alert('Gagal: ' + (result.message || 'Upload gagal'));
-            if (/Sesi/.test(result.message || '')) requireSession();
+            await uploadToR2(file, options, function (percent, status) {
+              setFileProgress(i, percent, status);
+            });
           }
+          setFileProgress(i, 100, 'Selesai');
+          success += 1;
         } catch (err) {
-          alert('Terjadi kesalahan jaringan saat mengunggah.');
-        } finally {
-          btn.disabled = false;
-          btn.textContent = 'Unggah ke Google Drive';
+          failed += 1;
+          if (!firstError) firstError = err.message || 'Gagal mengunggah.';
+          setFileProgress(i, 0, 'Gagal');
+          const row = document.getElementById('uploadFile' + i);
+          if (row) row.setAttribute('title', err.message || 'Gagal mengunggah.');
+          if (/Sesi/.test(err.message || '')) {
+            requireSession();
+            aborted = true;
+            break;
+          }
         }
-      };
-      reader.readAsDataURL(file);
+      }
+
+      updateOverallProgress(`Selesai: ${success} berhasil, ${failed} gagal.`);
+      btn.disabled = false;
+      btn.textContent = 'Unggah Dokumentasi';
+
+      if (success > 0) {
+        alert(`${success} file berhasil diunggah${task ? ' dan tugas ditandai selesai' : ''}.` + (failed ? ` ${failed} file gagal.` : ''));
+        document.getElementById('uploadForm').reset();
+        document.getElementById('unit').value = user.unit;
+        document.getElementById('uploader').value = user.nama;
+        loadMyProgress();
+        loadMyMedia();
+      } else {
+        alert('Semua file gagal diunggah. ' + (firstError || 'Periksa koneksi atau coba lagi.'));
+      }
     });
 
     async function loadMyMedia() {
@@ -355,22 +598,28 @@
           return;
         }
 
-        container.innerHTML = myFiles.map(item => `
+        container.innerHTML = myFiles.map(item => {
+          const isR2 = item.storage_type === 'r2';
+          return `
           <div class="border border-slate-200 rounded-lg p-3 bg-slate-50 flex flex-col justify-between">
             <div>
               <div class="flex justify-between items-start gap-2">
                 <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">${escapeHtml(item.task_judul || item.kategori)}</span>
-                <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded ${item.filetype === 'video' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}">${escapeHtml(item.filetype)}</span>
+                <span class="flex gap-1">
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded ${isR2 ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-600'}">${isR2 ? 'R2' : 'DRIVE'}</span>
+                  <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded ${item.filetype === 'video' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}">${escapeHtml(item.filetype)}</span>
+                </span>
               </div>
               <p class="font-semibold text-sm mt-2 text-slate-800 break-all">${escapeHtml(item.filename)}</p>
               <p class="text-xs text-slate-600 mt-1">${escapeHtml(item.keterangan)}</p>
             </div>
             <div class="mt-3 pt-2 border-t border-slate-200 flex justify-between items-center text-xs text-slate-500">
               <span>Oleh: ${escapeHtml(item.uploader)}</span>
-              <a href="${escapeHtml(safeUrl(item.drive_url))}" target="_blank" rel="noopener" class="text-emerald-600 font-semibold hover:underline">Lihat di Drive ↗</a>
+              <a href="${escapeHtml(safeUrl(item.drive_url))}" target="_blank" rel="noopener" class="text-emerald-600 font-semibold hover:underline">${isR2 ? 'Lihat File' : 'Lihat di Drive'} ↗</a>
             </div>
           </div>
-        `).join('');
+        `;
+        }).join('');
       } catch (e) {
         container.innerHTML = '<p class="text-sm text-red-500 col-span-full text-center py-8">Gagal memuat data.</p>';
       }

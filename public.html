@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Galeri Publik - Media Center</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="config.js"></script>
+  <script src="config.js?v=20261112"></script>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen">
 
@@ -83,6 +83,12 @@
         <button data-close-lightbox class="shrink-0 w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 text-white text-lg leading-none">&times;</button>
       </div>
       <div id="lightboxContent" class="flex-1 min-h-0 flex items-center justify-center"></div>
+      <div id="lightboxThumbs" class="flex gap-2 overflow-x-auto py-3"></div>
+      <div class="flex items-center justify-between gap-3 pb-1 text-xs text-slate-300">
+        <button type="button" data-lightbox-prev class="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20">‹ Sebelumnya</button>
+        <span id="lightboxCounter" class="text-slate-400"></span>
+        <button type="button" data-lightbox-next class="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20">Berikutnya ›</button>
+      </div>
     </div>
   </div>
 
@@ -97,6 +103,7 @@
     };
 
     let allMedia = [];
+    let currentAlbum = { id: '', items: [], index: 0 };
 
     function kategoriLabel(kategori) {
       return KATEGORI_LABEL[kategori] || kategori || 'Lainnya';
@@ -110,31 +117,84 @@
       return 'https://drive.google.com/file/d/' + encodeURIComponent(fileId) + '/preview';
     }
 
-    function cardTemplate(item) {
+    function previewHtml(item, size, extraClass) {
       const isVideo = item.filetype === 'video';
-      const thumb = thumbnailUrl(item.file_id, 800);
+      const isR2 = item.storage_type === 'r2';
+      const mediaUrl = safeUrl(item.drive_url);
       const caption = item.keterangan || item.filename || 'Dokumentasi';
+
+      if (isR2) {
+        return isVideo
+          ? `<video src="${escapeHtml(mediaUrl)}" preload="metadata" muted playsinline class="${extraClass}"></video>`
+          : `<img src="${escapeHtml(mediaUrl)}" alt="${escapeHtml(caption)}" loading="lazy" class="${extraClass}">`;
+      }
+
+      return `<img src="${escapeHtml(thumbnailUrl(item.file_id, size))}" alt="${escapeHtml(caption)}" loading="lazy" class="${extraClass}">`;
+    }
+
+    function albumCover(items) {
+      if (items.length <= 1) {
+        const item = items[0];
+        const isVideo = item.filetype === 'video';
+        const overlay = isVideo
+          ? '<span class="absolute inset-0 flex items-center justify-center bg-black/25"><span class="w-12 h-12 rounded-full bg-white/90 text-slate-900 flex items-center justify-center text-lg">▶</span></span>'
+          : '';
+        return `<div class="relative w-full h-full">${previewHtml(item, 800, 'w-full h-full object-cover')}${overlay}</div>`;
+      }
+
+      const covers = items.slice(0, 4);
+      let cells = covers.map(function (item) {
+        const isVideo = item.filetype === 'video';
+        const overlay = isVideo
+          ? '<span class="absolute inset-0 flex items-center justify-center bg-black/25"><span class="w-8 h-8 rounded-full bg-white/90 text-slate-900 flex items-center justify-center text-xs">▶</span></span>'
+          : '';
+        return `<div class="relative overflow-hidden bg-slate-800">${previewHtml(item, 400, 'w-full h-full object-cover')}${overlay}</div>`;
+      }).join('');
+
+      if (covers.length === 3) cells += '<div class="bg-slate-800"></div>';
+
+      const rows = covers.length === 2 ? '' : ' grid-rows-2';
+      return `<div class="grid grid-cols-2${rows} gap-0.5 w-full h-full">${cells}</div>`;
+    }
+
+    function albumCardTemplate(album) {
+      const items = album.items;
+      const first = items[0];
+      const isR2 = first.storage_type === 'r2';
+      const isVideo = first.filetype === 'video';
+      const caption = first.keterangan || first.filename || 'Dokumentasi';
+      const mediaUrl = safeUrl(first.drive_url);
+      const count = items.length;
+      const videoCount = items.filter(function (item) { return item.filetype === 'video'; }).length;
+      const photoCount = count - videoCount;
+      const countLabel = [
+        photoCount ? photoCount + ' foto' : '',
+        videoCount ? videoCount + ' video' : ''
+      ].filter(Boolean).join(' • ');
 
       return `
         <article class="group bg-slate-900 border border-slate-800 rounded-xl overflow-hidden flex flex-col">
-          <button type="button" data-lightbox="${escapeHtml(item.id)}" class="relative block w-full aspect-[4/3] bg-slate-800 overflow-hidden text-left">
-            <img src="${escapeHtml(thumb)}" alt="${escapeHtml(caption)}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
-            ${isVideo ? '<span class="absolute inset-0 flex items-center justify-center bg-black/25"><span class="w-12 h-12 rounded-full bg-white/90 text-slate-900 flex items-center justify-center text-lg">▶</span></span>' : ''}
+          <button type="button" data-album="${escapeHtml(album.id)}" class="relative block w-full aspect-[4/3] bg-slate-800 overflow-hidden text-left">
+            ${albumCover(items)}
+            <span class="absolute top-2 right-2 text-[10px] font-bold px-2 py-1 rounded-full bg-black/70 text-white">${count} file</span>
           </button>
           <div class="p-3 flex flex-col gap-2 flex-1">
             <div class="flex items-center justify-between gap-2">
-              <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300">${escapeHtml(kategoriLabel(item.kategori))}</span>
-              <span class="text-[10px] font-bold px-2 py-0.5 rounded ${isVideo ? 'bg-purple-500/15 text-purple-300' : 'bg-sky-500/15 text-sky-300'}">${isVideo ? 'VIDEO' : 'FOTO'}</span>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300">${escapeHtml(kategoriLabel(first.kategori))}</span>
+              <span class="flex gap-1">
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded ${isR2 ? 'bg-amber-500/15 text-amber-300' : 'bg-slate-500/15 text-slate-300'}">${isR2 ? 'R2' : 'DRIVE'}</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded ${isVideo ? 'bg-purple-500/15 text-purple-300' : 'bg-sky-500/15 text-sky-300'}">${countLabel || (isVideo ? 'VIDEO' : 'FOTO')}</span>
+              </span>
             </div>
             <p class="text-sm font-semibold text-slate-100 line-clamp-2">${escapeHtml(caption)}</p>
-            <p class="text-xs text-slate-400">${escapeHtml(item.unit)}</p>
+            <p class="text-xs text-slate-400">${escapeHtml(first.unit)}</p>
             <div class="mt-auto pt-2 border-t border-slate-800 flex items-center justify-between gap-2 text-[11px] text-slate-500">
-              <span class="truncate">${escapeHtml(item.uploader)}</span>
-              <span class="shrink-0">${escapeHtml(item.timestamp)}</span>
+              <span class="truncate">${escapeHtml(first.uploader)}</span>
+              <span class="shrink-0">${escapeHtml(first.timestamp)}</span>
             </div>
             <div class="flex gap-2 pt-1">
-              <button type="button" data-lightbox="${escapeHtml(item.id)}" class="flex-1 text-xs bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-semibold py-1.5 rounded-md">Lihat</button>
-              <a href="${escapeHtml(safeUrl(item.drive_url))}" target="_blank" rel="noopener" class="flex-1 text-center text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 py-1.5 rounded-md">Drive</a>
+              <button type="button" data-album="${escapeHtml(album.id)}" class="flex-1 text-xs bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-semibold py-1.5 rounded-md">${count > 1 ? 'Lihat Album' : 'Lihat'}</button>
+              <a href="${escapeHtml(mediaUrl)}" target="_blank" rel="noopener" class="flex-1 text-center text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 py-1.5 rounded-md">${isR2 ? 'Buka' : 'Drive'}</a>
             </div>
           </div>
         </article>
@@ -155,19 +215,37 @@
       });
     }
 
+    function getAlbums() {
+      const filtered = getFilteredMedia();
+      const map = new Map();
+
+      filtered.forEach(function (item) {
+        const key = item.batch_id || item.id;
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(item);
+      });
+
+      return Array.from(map.entries()).map(function (entry) {
+        const items = entry[1].slice().sort(function (a, b) {
+          return String(a.timestamp || '').localeCompare(String(b.timestamp || ''));
+        });
+        return { id: entry[0], items: items };
+      });
+    }
+
     function renderGallery() {
       const gallery = document.getElementById('gallery');
       const empty = document.getElementById('emptyState');
-      const items = getFilteredMedia();
+      const albums = getAlbums();
 
-      if (items.length === 0) {
+      if (albums.length === 0) {
         gallery.innerHTML = '';
         empty.classList.remove('hidden');
         return;
       }
 
       empty.classList.add('hidden');
-      gallery.innerHTML = items.map(cardTemplate).join('');
+      gallery.innerHTML = albums.map(albumCardTemplate).join('');
     }
 
     function populateFilters() {
@@ -212,47 +290,105 @@
       }
     }
 
-    function openLightbox(id) {
-      const item = allMedia.find(entry => entry.id === id);
-      if (!item) return;
+    function openAlbum(albumId, index) {
+      const album = getAlbums().find(function (entry) { return entry.id === albumId; });
+      if (!album || album.items.length === 0) return;
+
+      const safeIndex = Math.max(0, Math.min(index || 0, album.items.length - 1));
+      currentAlbum = { id: album.id, items: album.items, index: safeIndex };
+      renderLightbox();
 
       const lightbox = document.getElementById('lightbox');
-      const content = document.getElementById('lightboxContent');
+      lightbox.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function renderLightbox() {
+      const items = currentAlbum.items;
+      if (!items.length) return;
+
+      const index = currentAlbum.index;
+      const item = items[index];
       const title = document.getElementById('lightboxTitle');
       const meta = document.getElementById('lightboxMeta');
+      const content = document.getElementById('lightboxContent');
+      const thumbs = document.getElementById('lightboxThumbs');
+      const counter = document.getElementById('lightboxCounter');
 
       title.textContent = item.keterangan || item.filename || 'Dokumentasi';
       meta.textContent = [item.unit, item.uploader, item.timestamp].filter(Boolean).join(' • ');
 
-      if (item.filetype === 'video') {
-        content.innerHTML = `<iframe src="${escapeHtml(previewUrl(item.file_id))}" class="w-full h-[70vh] rounded-lg bg-black" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
+      const isR2 = item.storage_type === 'r2';
+      const mediaUrl = safeUrl(item.drive_url);
+
+      if (isR2) {
+        if (item.filetype === 'video') {
+          content.innerHTML = `<video src="${escapeHtml(mediaUrl)}" controls autoplay playsinline class="w-full max-h-[70vh] rounded-lg bg-black"></video>`;
+        } else {
+          content.innerHTML = `<img src="${escapeHtml(mediaUrl)}" alt="${escapeHtml(title.textContent)}" class="max-w-full max-h-[70vh] object-contain rounded-lg">`;
+        }
+      } else if (item.filetype === 'video') {
+        content.innerHTML = `<iframe src="${escapeHtml(previewUrl(item.file_id))}" class="w-full h-[65vh] rounded-lg bg-black" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
       } else {
-        const src = thumbnailUrl(item.file_id, 1600);
-        content.innerHTML = `<img src="${escapeHtml(src)}" alt="${escapeHtml(title.textContent)}" class="max-w-full max-h-[75vh] object-contain rounded-lg">`;
+        content.innerHTML = `<img src="${escapeHtml(thumbnailUrl(item.file_id, 1600))}" alt="${escapeHtml(title.textContent)}" class="max-w-full max-h-[70vh] object-contain rounded-lg">`;
       }
 
-      lightbox.classList.remove('hidden');
-      document.body.style.overflow = 'hidden';
+      counter.textContent = items.length > 1 ? `${index + 1} / ${items.length}` : '';
+      const prev = document.querySelector('[data-lightbox-prev]');
+      const next = document.querySelector('[data-lightbox-next]');
+      if (prev) prev.style.visibility = items.length > 1 ? 'visible' : 'hidden';
+      if (next) next.style.visibility = items.length > 1 ? 'visible' : 'hidden';
+
+      thumbs.innerHTML = items.map(function (entry, i) {
+        const active = i === index ? 'ring-2 ring-emerald-400' : 'opacity-60 hover:opacity-100';
+        return `<button type="button" data-thumb="${i}" class="shrink-0 w-16 h-16 rounded-lg overflow-hidden bg-slate-800 ${active}">${previewHtml(entry, 200, 'w-full h-full object-cover')}</button>`;
+      }).join('');
+    }
+
+    function moveLightbox(step) {
+      if (currentAlbum.items.length < 2) return;
+      const total = currentAlbum.items.length;
+      currentAlbum.index = (currentAlbum.index + step + total) % total;
+      renderLightbox();
     }
 
     function closeLightbox() {
       const lightbox = document.getElementById('lightbox');
       lightbox.classList.add('hidden');
       document.getElementById('lightboxContent').innerHTML = '';
+      document.getElementById('lightboxThumbs').innerHTML = '';
       document.body.style.overflow = '';
+      currentAlbum = { id: '', items: [], index: 0 };
     }
 
     document.getElementById('gallery').addEventListener('click', function (event) {
-      const trigger = event.target.closest('[data-lightbox]');
-      if (trigger) openLightbox(trigger.getAttribute('data-lightbox'));
+      const trigger = event.target.closest('[data-album]');
+      if (trigger) openAlbum(trigger.getAttribute('data-album'), 0);
     });
 
     document.getElementById('lightbox').addEventListener('click', function (event) {
-      if (event.target === this || event.target.closest('[data-close-lightbox]')) closeLightbox();
+      if (event.target === this || event.target.closest('[data-close-lightbox]')) {
+        closeLightbox();
+        return;
+      }
+
+      const thumb = event.target.closest('[data-thumb]');
+      if (thumb) {
+        currentAlbum.index = parseInt(thumb.getAttribute('data-thumb'), 10) || 0;
+        renderLightbox();
+        return;
+      }
+
+      if (event.target.closest('[data-lightbox-prev]')) moveLightbox(-1);
+      if (event.target.closest('[data-lightbox-next]')) moveLightbox(1);
     });
 
     document.addEventListener('keydown', function (event) {
+      const lightbox = document.getElementById('lightbox');
+      if (lightbox.classList.contains('hidden')) return;
       if (event.key === 'Escape') closeLightbox();
+      if (event.key === 'ArrowLeft') moveLightbox(-1);
+      if (event.key === 'ArrowRight') moveLightbox(1);
     });
 
     ['filterUnit', 'filterKategori'].forEach(function (id) {

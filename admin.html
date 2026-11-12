@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Koordinator</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="config.js"></script>
+  <script src="config.js?v=20261112"></script>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen">
 
@@ -165,8 +165,13 @@
               <textarea id="cfgSekolah" rows="2" class="w-full px-3 py-2 border rounded-lg" placeholder="SDIT A, SDIT B, SMP C"></textarea>
             </div>
             <div>
-              <label class="block text-xs font-medium mb-1">Maksimal Ukuran Upload (MB)</label>
+              <label class="block text-xs font-medium mb-1">Maksimal Ukuran Upload Drive (MB)</label>
               <input type="number" id="cfgMaxMb" min="1" max="25" required class="w-full px-3 py-2 border rounded-lg">
+            </div>
+            <div>
+              <label class="block text-xs font-medium mb-1">Maksimal Ukuran Upload R2 (MB)</label>
+              <input type="number" id="cfgMaxR2Mb" min="1" max="5120" required class="w-full px-3 py-2 border rounded-lg">
+              <p class="text-[11px] text-slate-500 mt-1">File di atas batas Drive hingga nilai ini diunggah langsung ke R2.</p>
             </div>
           <button type="submit" id="btnSaveConfig" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium">
             Update Konfigurasi
@@ -251,6 +256,7 @@
       document.getElementById('cfgEventName').value = cfg.EVENT_NAME || '';
       document.getElementById('cfgSekolah').value = cfg.SEKOLAH || '';
       document.getElementById('cfgMaxMb').value = cfg.MAX_FILE_MB || '25';
+      document.getElementById('cfgMaxR2Mb').value = cfg.MAX_R2_MB || '2048';
     });
 
     async function loadAllMedia() {
@@ -284,7 +290,9 @@
         return;
       }
 
-      tbody.innerHTML = filtered.map(item => `
+      tbody.innerHTML = filtered.map(item => {
+        const isR2 = item.storage_type === 'r2';
+        return `
         <tr class="hover:bg-slate-50">
           <td class="p-3 text-xs text-slate-500 whitespace-nowrap">${escapeHtml(item.timestamp)}</td>
           <td class="p-3">
@@ -296,15 +304,19 @@
             ${item.task_judul ? `<div class="text-xs text-slate-500 mt-1">${escapeHtml(item.task_judul)}</div>` : ''}
           </td>
           <td class="p-3">
-            <div class="font-medium text-slate-800 break-all">${escapeHtml(item.filename)}</div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${isR2 ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-600'}">${isR2 ? 'R2' : 'DRIVE'}</span>
+              <span class="font-medium text-slate-800 break-all">${escapeHtml(item.filename)}</span>
+            </div>
             <div class="text-xs text-slate-500">${escapeHtml(item.keterangan)}</div>
           </td>
           <td class="p-3 text-right whitespace-nowrap space-x-2">
-            <a href="${escapeHtml(safeUrl(item.drive_url))}" target="_blank" rel="noopener" class="text-xs bg-blue-600 text-white px-2.5 py-1.5 rounded hover:bg-blue-700">Buka Drive</a>
-            <button type="button" data-delete-id="${escapeHtml(item.id)}" data-file-id="${escapeHtml(item.file_id)}" class="text-xs bg-red-100 text-red-700 px-2.5 py-1.5 rounded hover:bg-red-200">Hapus</button>
+            <a href="${escapeHtml(safeUrl(item.drive_url))}" target="_blank" rel="noopener" class="text-xs bg-blue-600 text-white px-2.5 py-1.5 rounded hover:bg-blue-700">${isR2 ? 'Buka File' : 'Buka Drive'}</a>
+            <button type="button" data-delete-id="${escapeHtml(item.id)}" data-file-id="${escapeHtml(item.file_id)}" data-storage="${isR2 ? 'r2' : 'drive'}" class="text-xs bg-red-100 text-red-700 px-2.5 py-1.5 rounded hover:bg-red-200">Hapus</button>
           </td>
         </tr>
-      `).join('');
+      `;
+      }).join('');
     }
 
     async function loadUsers() {
@@ -420,14 +432,25 @@
     document.getElementById('tableBody').addEventListener('click', function (event) {
       const button = event.target.closest('[data-delete-id]');
       if (button) {
-        deleteItem(button.getAttribute('data-delete-id'), button.getAttribute('data-file-id'));
+        deleteItem(button.getAttribute('data-delete-id'), button.getAttribute('data-file-id'), button.getAttribute('data-storage') || 'drive');
       }
     });
 
-    async function deleteItem(id, fileId) {
-      if (!confirm('Hapus file ini secara permanen dari Drive & Database?')) return;
+    async function deleteItem(id, fileId, storageType) {
+      const isR2 = storageType === 'r2';
+      if (!confirm(isR2 ? 'Hapus file R2 ini secara permanen dari penyimpanan & database?' : 'Hapus file ini secara permanen dari Drive & Database?')) return;
       if (!requireSession()) return;
+
       try {
+        if (isR2) {
+          const r2Data = await apiPost({ action: 'deleteR2Object', token: getStoredToken(), key: fileId });
+          if (r2Data.status !== 'success') {
+            alert(r2Data.message || 'Gagal menghapus file R2.');
+            if (/Sesi/.test(r2Data.message || '')) requireSession();
+            return;
+          }
+        }
+
         const result = await apiPost({ action: 'deleteMedia', id: id, fileId: fileId, token: getStoredToken() });
         if (result.status !== 'success') {
           alert(result.message || 'Gagal menghapus');
@@ -525,7 +548,8 @@
             FOLDER_ID: document.getElementById('cfgFolderId').value.trim(),
             EVENT_NAME: document.getElementById('cfgEventName').value.trim(),
             SEKOLAH: document.getElementById('cfgSekolah').value.trim(),
-            MAX_FILE_MB: document.getElementById('cfgMaxMb').value.trim()
+            MAX_FILE_MB: document.getElementById('cfgMaxMb').value.trim(),
+            MAX_R2_MB: document.getElementById('cfgMaxR2Mb').value.trim()
           },
           token: getStoredToken()
         });

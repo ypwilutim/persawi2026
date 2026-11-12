@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbwkD0_IY7LXehJQ0LdllYF4j28FX2ocBFFgz-E9HpVeGw1_9akSwX_SYD1S9sJ4Eyp8/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwEng0rBpT0amPRjiBosCImD2NZrI6kVsInzPwJk-cqMnTURKc-jg4DcIhMZOuZCvCI/exec";
 
 function getStoredUser() {
   try {
@@ -37,7 +37,7 @@ async function apiGet(action, params) {
 async function apiPost(payload) {
   const res = await fetch(API_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify(payload)
   });
   return res.json();
@@ -48,7 +48,8 @@ const DEFAULT_SITE_CONFIG = {
   EVENT_SUBTITLE: "Perkemahan Santri Wahdah Islamiyah",
   EVENT_SLOGAN: "Tunas Muda Berjiwa Rabbani Menuju Luwu Timur Juara",
   SEKOLAH: "SDIT Insan Rabbani Malili",
-  MAX_FILE_MB: "25"
+  MAX_FILE_MB: "25",
+  MAX_R2_MB: "2048"
 };
 
 async function loadSiteConfig() {
@@ -65,6 +66,8 @@ async function loadSiteConfig() {
   const merged = Object.assign({}, DEFAULT_SITE_CONFIG, config);
   const maxMb = parseInt(merged.MAX_FILE_MB, 10);
   merged.MAX_FILE_MB = String(Math.min(Number.isFinite(maxMb) && maxMb > 0 ? maxMb : 25, 25));
+  const maxR2Mb = parseInt(merged.MAX_R2_MB, 10);
+  merged.MAX_R2_MB = String(Math.min(Number.isFinite(maxR2Mb) && maxR2Mb > 0 ? maxR2Mb : 2048, 5120));
   return merged;
 }
 
