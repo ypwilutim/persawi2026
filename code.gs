@@ -2,7 +2,7 @@ const CONFIG_PLACEHOLDER = 'TEMPEL_FOLDER_ID_DISINI';
 const DEFAULT_MAX_MB = 25;
 const SESSION_HOURS = 12;
 const CONFIG_KEYS = ['FOLDER_ID', 'EVENT_NAME', 'EVENT_SUBTITLE', 'EVENT_SLOGAN', 'MAX_FILE_MB'];
-const API_VERSION = '2026-11-12-tasks';
+const API_VERSION = '2026-11-12-register';
 
 function setupDatabaseSheets() {
   ensureDatabase_();
@@ -119,7 +119,8 @@ function doPost(e) {
       deleteRundown: ['admin'],
       addUser: ['admin'],
       deleteMedia: ['admin'],
-      updateConfig: ['admin']
+      updateConfig: ['admin'],
+      changePassword: ['media', 'admin']
     };
 
     if (Object.prototype.hasOwnProperty.call(protection, action)) {
@@ -146,6 +147,8 @@ function doPost(e) {
       return handleDeleteMedia(data.id, data.fileId);
     } else if (action === 'updateConfig') {
       return handleUpdateConfig(data.configs);
+    } else if (action === 'changePassword') {
+      return handleChangePassword(data);
     }
 
     return responseJSON({ status: 'error', message: 'Aksi tidak dikenal' });
@@ -159,11 +162,14 @@ function handleLogin(username, password) {
   const rows = sheet.getDataRange().getValues();
   const inputUser = String(username == null ? '' : username).trim();
   const inputPass = String(password == null ? '' : password);
+  const inputPhone = normalizePhone_(inputUser);
 
   for (let i = 1; i < rows.length; i++) {
     const rowUser = String(rows[i][0] == null ? '' : rows[i][0]).trim();
     const rowPass = String(rows[i][1] == null ? '' : rows[i][1]);
-    if (rowUser === inputUser && rowPass === inputPass) {
+    const rowPhone = normalizePhone_(rowUser) || normalizePhone_(rows[i][5]);
+    const matchesUser = rowUser === inputUser || (inputPhone && rowPhone && rowPhone === inputPhone);
+    if (matchesUser && rowPass === inputPass) {
       const user = {
         username: rowUser,
         role: String(rows[i][2] == null ? '' : rows[i][2]).trim(),
@@ -196,30 +202,35 @@ function handleRegisterMedia(data) {
 
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Users');
   const rows = sheet.getDataRange().getValues();
-  const existing = {};
-  const takenUsernames = {};
+  let existingUnit = '';
+  let existingPhone = '';
 
   for (let i = 1; i < rows.length; i++) {
     const role = cell_(rows[i][2]).trim();
     const rowUnit = cell_(rows[i][3]).trim();
+    const rowPhone = normalizePhone_(cell_(rows[i][0])) || normalizePhone_(cell_(rows[i][5]));
     if (role === 'media' && rowUnit.toLowerCase() === unit.toLowerCase()) {
-      existing.unit = rowUnit;
+      existingUnit = rowUnit;
     }
-    if (cell_(rows[i][0])) takenUsernames[cell_(rows[i][0]).toLowerCase()] = true;
+    if (rowPhone && rowPhone === normalizedPhone) {
+      existingPhone = rowPhone;
+    }
   }
 
-  if (existing.unit) {
-    return responseJSON({ status: 'error', message: 'Unit ' + existing.unit + ' sudah terdaftar. Silakan login atau hubungi admin.' });
+  if (existingUnit) {
+    return responseJSON({ status: 'error', message: 'Unit ' + existingUnit + ' sudah terdaftar. Silakan login atau hubungi admin.' });
+  }
+  if (existingPhone) {
+    return responseJSON({ status: 'error', message: 'Nomor ' + existingPhone + ' sudah terdaftar.' });
   }
 
-  const username = generateUsername_(unit, takenUsernames);
-  const password = generatePassword_();
-  sheet.appendRow([username, password, 'media', unit, nama, normalizedPhone]);
+  const password = 'persawi2026';
+  sheet.appendRow([normalizedPhone, password, 'media', unit, nama, normalizedPhone]);
 
   return responseJSON({
     status: 'success',
     message: 'Pendaftaran berhasil',
-    user: { username: username, password: password, unit: unit, nama: nama, telepon: normalizedPhone }
+    user: { username: normalizedPhone, password: password, unit: unit, nama: nama, telepon: normalizedPhone }
   });
 }
 
@@ -583,6 +594,32 @@ function handleUpdateConfig(configs) {
   return responseJSON({ status: 'success', message: 'Konfigurasi diperbarui' });
 }
 
+function handleChangePassword(data) {
+  const auth = data._auth;
+  const oldPassword = String(data.oldPassword == null ? '' : data.oldPassword);
+  const newPassword = String(data.newPassword == null ? '' : data.newPassword);
+
+  if (newPassword.length < 6) {
+    return responseJSON({ status: 'error', message: 'Password baru minimal 6 karakter.' });
+  }
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Users');
+  const rows = sheet.getDataRange().getValues();
+  const targetUser = String(auth.u || '').trim();
+
+  for (let i = 1; i < rows.length; i++) {
+    const rowUser = cell_(rows[i][0]).trim();
+    if (rowUser !== targetUser) continue;
+    if (cell_(rows[i][1]) !== oldPassword) {
+      return responseJSON({ status: 'error', message: 'Password lama salah.' });
+    }
+    sheet.getRange(i + 1, 2).setValue(newPassword);
+    return responseJSON({ status: 'success', message: 'Password berhasil diubah.' });
+  }
+
+  return responseJSON({ status: 'error', message: 'User tidak ditemukan.' });
+}
+
 function getRundownTasks_() {
   const rows = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Rundown').getDataRange().getValues();
   const tasks = [];
@@ -804,25 +841,6 @@ function normalizePhone_(value) {
     return '+62' + phone.slice(1);
   }
   return '';
-}
-
-function generateUsername_(unit, takenUsernames) {
-  const slug = String(unit || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 24) || 'unit';
-  const base = 'media_' + slug;
-
-  if (!takenUsernames[base.toLowerCase()]) return base;
-
-  let counter = 2;
-  while (takenUsernames[(base + '_' + counter).toLowerCase()]) counter++;
-  return base + '_' + counter;
-}
-
-function generatePassword_() {
-  return Utilities.getUuid().replace(/-/g, '').slice(0, 10);
 }
 
 function sanitizeFilename_(name) {

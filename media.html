@@ -78,6 +78,24 @@
             Unggah ke Google Drive
           </button>
         </form>
+
+        <div class="mt-6 pt-4 border-t border-slate-200">
+          <h3 class="font-bold text-sm text-slate-900">Ubah Password</h3>
+          <p class="text-[11px] text-slate-500 mt-1">Password default: <span class="font-mono">persawi2026</span>. Minimal 6 karakter.</p>
+          <form id="passwordForm" class="space-y-3 mt-3">
+            <div>
+              <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Password Lama</label>
+              <input type="password" id="oldPassword" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="Password saat ini">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Password Baru</label>
+              <input type="password" id="newPassword" required minlength="6" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="Minimal 6 karakter">
+            </div>
+            <button type="submit" id="btnChangePassword" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 rounded-lg text-sm">
+              Ubah Password
+            </button>
+          </form>
+        </div>
       </div>
 
       <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -140,7 +158,7 @@
       document.getElementById('fileLabel').textContent = `Pilih Foto / Video (Maks ${maxFileMB}MB/file)`;
     });
 
-    document.getElementById('userInfo').textContent = `${user.unit} • ${user.nama}`;
+    document.getElementById('userInfo').textContent = `${user.unit} • ${user.nama} • @${user.username}`;
     document.getElementById('unit').value = user.unit;
     document.getElementById('uploader').value = user.nama;
 
@@ -233,6 +251,35 @@
       select.value = id;
       document.getElementById('uploadForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
       document.getElementById('fileInput').focus();
+    });
+
+    document.getElementById('passwordForm').addEventListener('submit', async function (event) {
+      event.preventDefault();
+      if (!requireSession()) return;
+      const btn = document.getElementById('btnChangePassword');
+      btn.disabled = true;
+      btn.textContent = 'Menyimpan...';
+
+      try {
+        const result = await apiPost({
+          action: 'changePassword',
+          oldPassword: document.getElementById('oldPassword').value,
+          newPassword: document.getElementById('newPassword').value,
+          token: getStoredToken()
+        });
+        if (result.status === 'success') {
+          alert(result.message || 'Password berhasil diubah.');
+          document.getElementById('passwordForm').reset();
+        } else {
+          alert(result.message || 'Gagal mengubah password');
+          if (/Sesi/.test(result.message || '')) requireSession();
+        }
+      } catch (err) {
+        alert('Terjadi kesalahan jaringan.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Ubah Password';
+      }
     });
 
     document.getElementById('uploadForm').addEventListener('submit', function(e) {
